@@ -64,6 +64,17 @@ GitHub Pages is wired through `.github/workflows/deploy.yml`. After enabling
 **Settings → Pages → Source: GitHub Actions**, every push to `main` rebuilds with
 `--base=./` and publishes to <https://smir1998.github.io/medlens-ai/>.
 
+> **Site shows “There isn't a GitHub Pages site here”?** It's a settings issue, not a
+> build issue:
+> 1. Repo **Settings → Pages → Build and deployment → Source** must be **GitHub Actions**
+>    (not “Deploy from a branch”).
+> 2. The repo must be **public** (free-tier Pages doesn't serve private repos) and named
+>    exactly `medlens-ai` — the URL path has to match the repo name.
+> 3. Check the **Actions** tab: the *Deploy to GitHub Pages* run must be green.
+>    No run at all → `.github/workflows/deploy.yml` wasn't pushed; re-run with
+>    `git add -A && git commit -m "add pages workflow" && git push`.
+> 4. First publish takes ~1–2 minutes — then hard-refresh.
+
 ## ✦ Project structure
 
 ```

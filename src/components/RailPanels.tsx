@@ -96,7 +96,7 @@ export function ModelVitals() {
 export interface HistoryEntry {
   id: number;
   time: string;
-  type: "symptom" | "image";
+  type: "symptom" | "image" | "derm";
   title: string;
   confidence: number;
 }
@@ -122,15 +122,22 @@ export function HistoryPanel({ entries }: { entries: HistoryEntry[] }) {
             >
               <span
                 className={`grid h-6 w-6 shrink-0 place-items-center ${
-                  e.type === "image" ? "bg-alert/15 text-alert" : "bg-teal/15 text-teal"
+                  e.type === "image"
+                    ? "bg-alert/15 text-alert"
+                    : e.type === "derm"
+                      ? "bg-amber/25 text-ink"
+                      : "bg-teal/15 text-teal"
                 }`}
               >
-                <Icon name={e.type === "image" ? "scan" : "stetho"} className="h-3.5 w-3.5" />
+                <Icon
+                  name={e.type === "image" ? "scan" : e.type === "derm" ? "scope" : "stetho"}
+                  className="h-3.5 w-3.5"
+                />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-xs font-semibold">{e.title}</span>
                 <span className="font-mono text-[9px] tracking-wider text-inksoft/70">
-                  {e.time} · {e.type === "image" ? "CNN" : "NLP-SYMPTOMS"}
+                  {e.time} · {e.type === "image" ? "CNN" : e.type === "derm" ? "CNN-DERM" : "NLP-SYMPTOMS"}
                 </span>
               </span>
               <span className="font-mono text-[11px] font-bold tabular-nums text-teal">

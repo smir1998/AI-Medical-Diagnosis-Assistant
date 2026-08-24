@@ -1,13 +1,15 @@
 import type { ImageResult, SymptomResult } from "../lib/engine";
+import type { DermResult } from "./DermScan";
 import { Icon } from "./ui";
 
 interface Props {
   symptom: SymptomResult | null;
   image: ImageResult | null;
+  derm?: DermResult | null;
 }
 
-export function ReportPanel({ symptom, image }: Props) {
-  if (!symptom && !image) return null;
+export function ReportPanel({ symptom, image, derm }: Props) {
+  if (!symptom && !image && !derm) return null;
 
   const top = symptom?.scored[0];
   const now = new Date();
@@ -107,6 +109,38 @@ export function ReportPanel({ symptom, image }: Props) {
                 {image.pneumonia > 50 ? "Pneumonia pattern" : "No acute abnormality"}
               </span>{" "}
               — pneumonia {image.pneumonia.toFixed(1)}% / normal {image.normal.toFixed(1)}%
+            </p>
+          </div>
+        )}
+
+        {/* dermatology screening */}
+        {derm && (
+          <div className="mt-3 space-y-2 border-t border-dashed border-ink/25 pt-3 font-mono text-xs leading-relaxed">
+            <p className="font-mono text-[10px] font-bold tracking-[0.28em] text-teal">
+              ── SCREENING · DERMATOSCOPY
+            </p>
+            <p>
+              <span className="text-inksoft">STUDY&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</span> {derm.fileName}
+            </p>
+            <p>
+              <span className="text-inksoft">PROFILE&nbsp;&nbsp;&nbsp;:</span>{" "}
+              <span
+                className={`font-bold ${
+                  derm.melanoma >= 35 ? "text-alert" : derm.atypical >= 35 ? "text-amber" : "text-teal"
+                }`}
+              >
+                {derm.melanoma >= 35
+                  ? "Melanoma-pattern risk"
+                  : derm.atypical >= 35
+                    ? "Atypical nevus pattern"
+                    : "Benign pattern"}
+              </span>{" "}
+              — benign {derm.benign.toFixed(1)}% / atypical {derm.atypical.toFixed(1)}% / melanoma{" "}
+              {derm.melanoma.toFixed(1)}%
+            </p>
+            <p>
+              <span className="text-inksoft">ABCDE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</span>{" "}
+              {derm.flags.map((f) => `${f.key}${f.status === "warn" ? "▲" : "✓"}`).join("  ")}
             </p>
           </div>
         )}

@@ -206,6 +206,12 @@ export function Icon({ name, className = "h-4 w-4" }: { name: IconName; classNam
     arrow: <path d="M4 12h16m0 0-6-6m6 6-6 6" />,
     clock: <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3.5 2" />,
     layers: <path d="m12 3 9 5-9 5-9-5 9-5zM3 13l9 5 9-5M3 17.5l9 5 9-5" />,
+    scope: (
+      <>
+        <circle cx="10.5" cy="10.5" r="6.5" />
+        <path d="m20.5 20.5-5.4-5.4M8 10.5h5M10.5 8v5" />
+      </>
+    ),
   };
   return (
     <svg
@@ -239,4 +245,5 @@ export type IconName =
   | "x"
   | "arrow"
   | "clock"
-  | "layers";
+  | "layers"
+  | "scope";

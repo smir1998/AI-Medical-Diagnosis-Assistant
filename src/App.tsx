@@ -5,17 +5,19 @@ import { nowTime } from "./lib/engine";
 import { StatusBar } from "./components/StatusBar";
 import { SymptomChecker } from "./components/SymptomChecker";
 import { ImageAnalysis } from "./components/ImageAnalysis";
+import { DermScan, type DermResult } from "./components/DermScan";
 import { Chatbot } from "./components/Chatbot";
 import { ReportPanel } from "./components/ReportPanel";
 import { HistoryPanel, ModelVitals, PipelinePanel, type HistoryEntry } from "./components/RailPanels";
 import { Evaluation, FieldNotes, InsideModel } from "./components/InfoSections";
 import { CountUp, ECGLine, Icon, Reveal, Scramble, SectionTag, type IconName } from "./components/ui";
 
-type Tab = "symptoms" | "image" | "chat";
+type Tab = "symptoms" | "image" | "derm" | "chat";
 
 const TABS: { id: Tab; label: string; icon: IconName; hint: string }[] = [
   { id: "symptoms", label: "Symptom Lab", icon: "stetho", hint: "NLP-encoded differential" },
   { id: "image", label: "Radiology Lab", icon: "scan", hint: "CNN · chest X-ray" },
+  { id: "derm", label: "Derm Scan", icon: "scope", hint: "CNN · skin lesions" },
   { id: "chat", label: "NLP Desk", icon: "chat", hint: "medical Q&A" },
 ];
 
@@ -24,6 +26,7 @@ export default function App() {
   const [pipeline, setPipeline] = useState({ stage: -1, running: false });
   const [symptomResult, setSymptomResult] = useState<SymptomResult | null>(null);
   const [imageResult, setImageResult] = useState<ImageResult | null>(null);
+  const [dermResult, setDermResult] = useState<DermResult | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
   const onPipeline = (stage: number, running: boolean) => setPipeline({ stage, running });
@@ -56,6 +59,20 @@ export default function App() {
     ]);
   };
 
+  const onDermDone = (r: DermResult) => {
+    setDermResult(r);
+    setHistory((h) => [
+      {
+        id: Date.now(),
+        time: nowTime(),
+        type: "derm" as const,
+        title: r.fileName,
+        confidence: Math.max(r.benign, r.atypical, r.melanoma),
+      },
+      ...h,
+    ]);
+  };
+
   return (
     <div id="top" className="min-h-screen">
       <div className="noise-overlay" aria-hidden="true" />
@@ -79,9 +96,10 @@ export default function App() {
               </h1>
               <Reveal delay={150}>
                 <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-inksoft">
-                  An AI triage workstation that fuses three heads — a <strong className="text-ink">symptom encoder</strong>,
-                  a <strong className="text-ink">chest-X-ray CNN</strong> and a <strong className="text-ink">medical NLP desk</strong> —
-                  into one decision-support report. Built to teach the pipeline, not to replace your doctor.
+                  An AI triage workstation that fuses four heads — a <strong className="text-ink">symptom encoder</strong>,
+                  a <strong className="text-ink">chest-X-ray CNN</strong>, a <strong className="text-ink">dermoscopy CNN</strong> and a{" "}
+                  <strong className="text-ink">medical NLP desk</strong> — into one decision-support report. Built to teach the
+                  pipeline, not to replace your doctor.
                 </p>
               </Reveal>
             </div>
@@ -161,11 +179,12 @@ export default function App() {
             <div className="border-2 border-ink bg-paper p-5 shadow-[9px_9px_0_0_rgba(11,47,45,0.85)] sm:p-7">
               {tab === "symptoms" && <SymptomChecker onComplete={onSymptomDone} onPipeline={onPipeline} />}
               {tab === "image" && <ImageAnalysis onComplete={onImageDone} onPipeline={onPipeline} />}
+              {tab === "derm" && <DermScan onDone={onDermDone} onPipeline={onPipeline} />}
               {tab === "chat" && <Chatbot />}
             </div>
 
             <div className="mt-8">
-              <ReportPanel symptom={symptomResult} image={imageResult} />
+              <ReportPanel symptom={symptomResult} image={imageResult} derm={dermResult} />
             </div>
           </div>
 

@@ -250,7 +250,7 @@ export const CHAT_KB: ChatEntry[] = [
   {
     keys: ["how", "predict", "work", "model", "algorithm"],
     answer:
-      "Two heads: (1) a symptom encoder converts your checked symptoms into a weighted feature vector and scores 12 disease profiles with a softmax head; (2) a CNN scores uploaded radiographs. Both are deterministic educational simulations of real clinical ML pipelines.",
+      "Three heads: (1) a symptom encoder converts checked symptoms into a weighted feature vector and scores 12 disease profiles with a softmax head; (2) a CNN scores uploaded chest radiographs; (3) a dermoscopy CNN classifies skin lesions against the ABCDE rule. All are deterministic educational simulations of real clinical ML pipelines.",
   },
   {
     keys: ["accurate", "trust", "reliable", "real"],
@@ -361,6 +361,8 @@ export const TICKER_ITEMS = [
   "12 disease profiles",
   "Recall-first triage policy",
   "Grad-CAM attention mapping",
+  "ISIC-2019 · 25,331 dermoscopy images",
+  "ABCDE rule enforcement",
   "Zero data leaves your browser",
   "Educational build · not a medical device",
 ];

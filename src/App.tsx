@@ -88,7 +88,7 @@ export default function App() {
           <div className="flex flex-wrap items-end justify-between gap-6">
             <div>
               <Reveal>
-                <SectionTag tone="alert">Project #8 · deep learning in healthcare</SectionTag>
+                <SectionTag tone="alert">Deep Learning in Health Care</SectionTag>
               </Reveal>
               <h1 className="mt-4 font-display text-[13vw] font-black leading-[0.88] tracking-tight sm:text-6xl lg:text-7xl">
                 <Scramble text="DIAGNOSTIC" />

@@ -238,6 +238,11 @@ export const CHAT_KB: ChatEntry[] = [
       "Seek urgent care for: chest pain, difficulty breathing, confusion, stiff neck with fever, oxygen saturation below 94%, dehydration, or any symptom that is severe or rapidly worsening. This tool is educational — it never replaces a clinician.",
   },
   {
+    keys: ["accurate", "reliable", "trust", "misdiagnose", "how good", "validated"],
+    answer:
+      "Validation-wise, PneumoNet v3 holds 94.2% accuracy with 95.1% recall on held-out studies — but this console runs deterministic teaching simulations, not those trained weights. Treat every output as a demonstration of the pipeline, never as a personal diagnosis; clinician review plus proper imaging is the only ground truth.",
+  },
+  {
     keys: ["fever"],
     answer:
       "Fever is a defence response, usually infectious. Rest, fluids, and paracetamol help. Consult a clinician if it exceeds 39.4 °C, lasts over 3 days, or comes with rash, stiff neck, breathing difficulty or chest pain.",

@@ -15,7 +15,7 @@ export function ReportPanel({ symptom, image, derm }: Props) {
   const now = new Date();
   const refId = `PT-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(
     now.getDate()
-  ).padStart(2, "0")}-${(symptom?.meta.runId ?? image?.runId ?? "0000")}`;
+  ).padStart(2, "0")}-${(symptom?.meta.runId ?? image?.runId ?? (derm ? `DS-${derm.time.replace(/:/g, "")}` : "0000"))}`;
 
   return (
     <div className="space-y-3">

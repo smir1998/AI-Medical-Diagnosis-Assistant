@@ -9,6 +9,8 @@ import { DermScan, type DermResult } from "./components/DermScan";
 import { Chatbot } from "./components/Chatbot";
 import { ReportPanel } from "./components/ReportPanel";
 import { HistoryPanel, ModelVitals, PipelinePanel, type HistoryEntry } from "./components/RailPanels";
+import { QABench } from "./components/QABench";
+import { TEST_CASES } from "./lib/tests";
 import { Evaluation, FieldNotes, InsideModel } from "./components/InfoSections";
 import { CountUp, ECGLine, Icon, Reveal, Scramble, SectionTag, type IconName } from "./components/ui";
 
@@ -28,6 +30,7 @@ export default function App() {
   const [imageResult, setImageResult] = useState<ImageResult | null>(null);
   const [dermResult, setDermResult] = useState<DermResult | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [qaOpen, setQaOpen] = useState(false);
 
   const onPipeline = (stage: number, running: boolean) => setPipeline({ stage, running });
 
@@ -76,7 +79,8 @@ export default function App() {
   return (
     <div id="top" className="min-h-screen">
       <div className="noise-overlay" aria-hidden="true" />
-      <StatusBar />
+      <StatusBar onQA={() => setQaOpen(true)} />
+      {qaOpen && <QABench onClose={() => setQaOpen(false)} />}
 
       {/* ---------- triage board ---------- */}
       <section className="border-b border-ink/15">
@@ -240,8 +244,14 @@ export default function App() {
               </p>
             </div>
           </div>
-          <div className="mt-10 flex items-center gap-4 border-t border-mint/15 pt-5">
-            <ECGLine className="h-6 flex-1 text-mint/60" />
+          <div className="mt-10 flex flex-wrap items-center gap-4 border-t border-mint/15 pt-5">
+            <ECGLine className="h-6 min-w-[120px] flex-1 text-mint/60" />
+            <button
+              onClick={() => setQaOpen(true)}
+              className="inline-flex items-center gap-1.5 border border-mint/35 px-3 py-1.5 font-mono text-[10px] font-bold tracking-[0.2em] text-mint/85 transition-all duration-200 hover:-translate-y-px hover:bg-mint hover:text-pine"
+            >
+              <Icon name="check" className="h-3 w-3" /> RUN QA BENCH · {TEST_CASES.length} CASES
+            </button>
             <span className="font-mono text-[10px] tracking-[0.24em] text-paper/40">© 2026 · EDUCATIONAL USE</span>
           </div>
         </div>

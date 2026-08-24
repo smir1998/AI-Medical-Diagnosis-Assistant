@@ -59,7 +59,7 @@ const reduced =
 type Probs = { benign: number; atypical: number; melanoma: number };
 
 /** Deterministic pixel-statistics heuristic for user uploads (screening demo). */
-function analyzePixels(dataUrl: string, seed: number): Promise<Probs> {
+export function analyzePixels(dataUrl: string, seed: number): Promise<Probs> {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
@@ -102,7 +102,7 @@ function analyzePixels(dataUrl: string, seed: number): Promise<Probs> {
   });
 }
 
-function buildFlags(p: Probs): DermFlag[] {
+export function buildFlags(p: Probs): DermFlag[] {
   const high = p.melanoma >= 30 || p.atypical >= 40;
   const mid = p.atypical + p.melanoma >= 40;
   return [

@@ -16,7 +16,7 @@ const QUICK = [
   "Is this tool accurate?",
 ];
 
-function matchAnswer(input: string): string {
+export function matchAnswer(input: string): string {
   const q = input.toLowerCase();
   let best: { score: number; answer: string } = { score: 0, answer: CHAT_FALLBACK };
   for (const entry of CHAT_KB) {

@@ -11,7 +11,7 @@ function StatusChip({ label, value, ok = true }: { label: string; value: string;
   );
 }
 
-export function StatusBar() {
+export function StatusBar({ onQA }: { onQA?: () => void }) {
   const [time, setTime] = useState("--:--:--");
   const [date, setDate] = useState("");
 
@@ -54,6 +54,16 @@ export function StatusBar() {
         </div>
 
         <div className="ml-auto flex items-center gap-4">
+          {onQA && (
+            <button
+              onClick={onQA}
+              className="group inline-flex items-center gap-1.5 border border-mint/40 bg-mint/10 px-2.5 py-1 font-mono text-[10px] font-bold tracking-[0.18em] text-mint transition-all duration-200 hover:-translate-y-px hover:bg-mint hover:text-pine"
+              title="Run the in-browser regression suite"
+            >
+              <Icon name="check" className="h-3 w-3 transition-transform duration-300 group-hover:scale-125" />
+              QA BENCH
+            </button>
+          )}
           <span className="hidden text-right font-mono text-[10px] leading-tight text-paper/60 sm:block">
             {date}
             <span className="block text-[9px] tracking-[0.2em] text-paper/35">STATION 08 · ED TRIAGE</span>

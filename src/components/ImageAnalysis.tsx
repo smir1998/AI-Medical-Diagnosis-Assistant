@@ -18,6 +18,7 @@ export function ImageAnalysis({ onComplete, onPipeline }: Props) {
   const [running, setRunning] = useState(false);
   const [logIdx, setLogIdx] = useState(-1);
   const [result, setResult] = useState<ImageResult | null>(null);
+  const [fileErr, setFileErr] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const alive = useRef(true);
 
@@ -30,6 +31,7 @@ export function ImageAnalysis({ onComplete, onPipeline }: Props) {
 
   const loadSample = (kind: "pneumonia-sample" | "normal-sample") => {
     if (running) return;
+    setFileErr(null);
     setResult(null);
     setLogIdx(-1);
     setSource(kind);
@@ -40,7 +42,12 @@ export function ImageAnalysis({ onComplete, onPipeline }: Props) {
 
   const acceptFile = useCallback(
     (file: File | undefined | null) => {
-      if (running || !file || !file.type.startsWith("image/")) return;
+      if (running || !file) return;
+      if (!file.type.startsWith("image/")) {
+        setFileErr(`"${file.name}" rejected — the CNN intake accepts JPG / PNG radiograph exports only.`);
+        return;
+      }
+      setFileErr(null);
       setResult(null);
       setLogIdx(-1);
       setSource("upload");
@@ -108,9 +115,17 @@ export function ImageAnalysis({ onComplete, onPipeline }: Props) {
           type="file"
           accept="image/*"
           className="hidden"
-          onChange={(e) => acceptFile(e.target.files?.[0])}
+          onChange={(e) => {
+            acceptFile(e.target.files?.[0]);
+            e.target.value = "";
+          }}
         />
       </div>
+      {fileErr && (
+        <p className="flex items-start gap-2 border border-alert/50 bg-alert/10 px-3 py-2 font-mono text-[11px] font-semibold text-alertdeep">
+          <Icon name="warn" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-alert" /> {fileErr}
+        </p>
+      )}
 
       <div className="grid gap-5 lg:grid-cols-[1.15fr_1fr]">
         {/* viewer */}

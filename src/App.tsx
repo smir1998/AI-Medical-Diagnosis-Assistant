@@ -2,16 +2,17 @@ import { useState } from "react";
 import { TICKER_ITEMS } from "./data/medical";
 import type { ImageResult, SymptomResult } from "./lib/engine";
 import { nowTime } from "./lib/engine";
-import { TEST_CASES } from "./lib/tests";
 import { StatusBar } from "./components/StatusBar";
 import { SymptomChecker } from "./components/SymptomChecker";
 import { ImageAnalysis } from "./components/ImageAnalysis";
-import { DermScan, type DermResult } from "./components/DermScan";
+import { DermScan } from "./components/DermScan";
+import type { DermResult } from "./components/DermScan";
 import { Chatbot } from "./components/Chatbot";
 import { ReportPanel } from "./components/ReportPanel";
 import { HistoryPanel, ModelVitals, PipelinePanel, type HistoryEntry } from "./components/RailPanels";
 import { Evaluation, FieldNotes, InsideModel } from "./components/InfoSections";
 import { QABench } from "./components/QABench";
+import { TEST_CASES } from "./lib/tests";
 import { CountUp, ECGLine, Icon, Reveal, Scramble, SectionTag, type IconName } from "./components/ui";
 
 type Tab = "symptoms" | "image" | "derm" | "chat";
@@ -117,7 +118,7 @@ export default function App() {
                   { k: "Disease profiles", v: 12, d: 0 },
                   { k: "Top-model acc.", v: 94.2, d: 1, suffix: "%" },
                 ].map((s) => (
-                  <div key={s.k} className="-ml-px -mt-px border border-ink/15 px-5 py-4">
+                  <div key={s.k} className="border border-ink/15 px-5 py-4">
                     <dt className="font-mono text-[9px] tracking-[0.18em] text-inksoft uppercase">{s.k}</dt>
                     <dd className="mt-1 font-display text-2xl font-black tabular-nums text-ink">
                       <CountUp value={s.v} decimals={s.d} suffix={s.suffix ?? ""} />
@@ -211,7 +212,7 @@ export default function App() {
             <div>
               <p className="flex items-center gap-2.5 font-display text-xl font-black tracking-tight">
                 <span className="grid h-8 w-8 place-items-center bg-alert text-paper">
-                  <Icon name="warn" className="h-4 w-4" />
+                  <Icon name="warn" className="h-4.5 w-4.5" />
                 </span>
                 Read this before anything else.
               </p>
@@ -236,7 +237,7 @@ export default function App() {
               </div>
               <button
                 onClick={() => setQaOpen(true)}
-                className="group mt-5 inline-flex items-center gap-2 border border-mint/40 bg-mint/10 px-3.5 py-2 font-mono text-[10px] font-bold tracking-[0.2em] text-mint transition-all duration-200 hover:-translate-y-px hover:bg-mint hover:text-pine"
+                className="group mt-5 inline-flex items-center gap-2 border border-mint/40 px-3.5 py-2 font-mono text-[11px] font-bold tracking-[0.18em] text-mint transition-all duration-200 hover:-translate-y-px hover:bg-mint hover:text-pine"
               >
                 <Icon name="check" className="h-3 w-3" /> RUN QA BENCH · {TEST_CASES.length} CASES
               </button>

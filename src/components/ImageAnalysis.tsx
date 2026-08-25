@@ -19,6 +19,7 @@ export function ImageAnalysis({ onComplete, onPipeline }: Props) {
   const [logIdx, setLogIdx] = useState(-1);
   const [result, setResult] = useState<ImageResult | null>(null);
   const [fileErr, setFileErr] = useState<string | null>(null);
+  const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const alive = useRef(true);
 
@@ -34,6 +35,7 @@ export function ImageAnalysis({ onComplete, onPipeline }: Props) {
     setFileErr(null);
     setResult(null);
     setLogIdx(-1);
+    setDims(null);
     setSource(kind);
     setFileName(kind === "pneumonia-sample" ? "PA_chest_0412.dcm.png" : "PA_chest_0107.dcm.png");
     setSeedKey(String(Date.now()));
@@ -50,6 +52,7 @@ export function ImageAnalysis({ onComplete, onPipeline }: Props) {
       setFileErr(null);
       setResult(null);
       setLogIdx(-1);
+      setDims(null);
       setSource("upload");
       setFileName(file.name);
       setSeedKey(`${file.size}-${file.name}`);
@@ -156,6 +159,9 @@ export function ImageAnalysis({ onComplete, onPipeline }: Props) {
               <img
                 src={imgSrc}
                 alt={fileName || "Chest radiograph"}
+                onLoad={(e) =>
+                  setDims({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })
+                }
                 className="mx-auto max-h-[340px] w-auto max-w-full border border-mint/25 object-contain"
                 draggable={false}
               />
@@ -178,7 +184,8 @@ export function ImageAnalysis({ onComplete, onPipeline }: Props) {
                 />
               )}
               <p className="mt-2 text-center font-mono text-[10px] tracking-[0.2em] text-mint/60">
-                {fileName.toUpperCase() || "AWAITING STUDY"} · DROP OR BROWSE TO REPLACE
+                {fileName.toUpperCase() || "AWAITING STUDY"}
+                {dims && <span className="text-mint"> · {dims.w}×{dims.h}px</span>} · DROP OR BROWSE TO REPLACE
               </p>
             </div>
           ) : (
@@ -192,6 +199,11 @@ export function ImageAnalysis({ onComplete, onPipeline }: Props) {
         {/* pipeline console + results */}
         <div className="flex flex-col gap-4">
           <div className="dark-grid min-h-[190px] flex-1 border border-pine px-4 py-3 font-mono text-[11px] leading-relaxed text-mint">
+            {imgSrc && (
+              <p className="text-mint/80">
+                ▸ buffer decoded{dims ? ` · ${dims.w}×${dims.h}×3 → tensor` : " …"}
+              </p>
+            )}
             {logIdx === -1 && !running && (
               <span className="text-mint/40">// CNN pipeline trace …</span>
             )}

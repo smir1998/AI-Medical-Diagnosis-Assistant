@@ -19,6 +19,13 @@ interface Props {
   onPipeline: (stage: number, running: boolean) => void;
 }
 
+const PRESETS: { label: string; ids: string[]; dur: number; sev: number }[] = [
+  { label: "FLU-LIKE", ids: ["fever", "cough", "muscle_aches", "fatigue", "chills"], dur: 1, sev: 6 },
+  { label: "CARDIAC ALARM", ids: ["chest_pain", "shortness_breath", "dizziness"], dur: 0, sev: 9 },
+  { label: "GI BUG", ids: ["diarrhea", "vomiting", "nausea", "abdominal_pain"], dur: 1, sev: 5 },
+  { label: "NEURO", ids: ["headache", "nausea", "dizziness"], dur: 3, sev: 4 },
+];
+
 export function SymptomChecker({ onComplete, onPipeline }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set(["fever", "cough", "fatigue"]));
   const [durationIdx, setDurationIdx] = useState(1);
@@ -73,6 +80,61 @@ export function SymptomChecker({ onComplete, onPipeline }: Props) {
 
   return (
     <div className="space-y-6">
+      {/* scenario presets */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="mr-1 font-mono text-[9px] font-bold tracking-[0.22em] text-inksoft">
+          SCENARIOS:
+        </span>
+        {PRESETS.map((p) => (
+          <button
+            key={p.label}
+            disabled={running}
+            onClick={() => {
+              setSelected(new Set(p.ids));
+              setDurationIdx(p.dur);
+              setSeverity(p.sev);
+              setResult(null);
+            }}
+            className="border border-ink/25 bg-paperdeep/60 px-2.5 py-1 font-mono text-[10px] font-semibold tracking-wider text-inksoft transition-all duration-200 hover:-translate-y-px hover:border-alert hover:text-alert disabled:opacity-50"
+          >
+            {p.label}
+          </button>
+        ))}
+        <button
+          disabled={running || selected.size === 0}
+          onClick={() => {
+            setSelected(new Set());
+            setResult(null);
+          }}
+          className="ml-auto border border-dashed border-ink/30 px-2.5 py-1 font-mono text-[10px] tracking-wider text-inksoft transition-all duration-200 hover:border-alert hover:text-alert disabled:opacity-40"
+        >
+          CLEAR ALL
+        </button>
+      </div>
+
+      {/* live one-hot vector */}
+      <div className="dark-grid border border-pine p-3">
+        <p className="mb-2 flex items-center justify-between font-mono text-[9px] font-bold tracking-[0.22em] text-mint/60">
+          <span>SYMPTOM VECTOR · 24-DIM ONE-HOT · {selected.size} ACTIVE</span>
+          <span className={running ? "blink-soft text-mint" : ""}>{running ? "ENCODING…" : "IDLE"}</span>
+        </p>
+        <div className="flex gap-[3px]">
+          {SYMPTOMS.map((s, i) => {
+            const on = selected.has(s.id);
+            return (
+              <span
+                key={s.id}
+                title={`${s.label} = ${on ? 1 : 0}`}
+                className={`h-5 flex-1 transition-all duration-300 ${
+                  on ? "bg-mint shadow-[0_0_9px_rgba(143,227,207,0.75)]" : "bg-paper/10 hover:bg-paper/25"
+                } ${running ? "blink-soft" : ""}`}
+                style={{ transitionDelay: `${i * 14}ms`, animationDelay: `${i * 55}ms` }}
+              />
+            );
+          })}
+        </div>
+      </div>
+
       {/* intake form */}
       <div>
         <div className="mb-3 flex items-baseline justify-between">

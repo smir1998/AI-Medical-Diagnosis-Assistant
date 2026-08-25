@@ -163,6 +163,9 @@ body {
 .report-card {
   break-inside: avoid;
 }
+@page {
+  margin: 12mm;
+}
 @media print {
   .no-print,
   .noise-overlay {
@@ -172,7 +175,21 @@ body {
     background: #fff !important;
     background-image: none !important;
   }
+  /* isolate the report: hide everything else on the page */
+  body * {
+    visibility: hidden !important;
+  }
+  .report-card,
+  .report-card * {
+    visibility: visible !important;
+  }
   .report-card {
+    position: absolute !important;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    border-width: 1px !important;
     box-shadow: none !important;
   }
 }

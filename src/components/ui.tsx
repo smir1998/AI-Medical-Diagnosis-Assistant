@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { prefersReducedMotion } from "../lib/engine";
 
 /* ---------- scroll reveal ---------- */
 
@@ -18,11 +17,9 @@ export function Reveal({
     if (!el) return;
     const io = new IntersectionObserver(
       (entries) => {
-        for (const e of entries) {
-          if (e.isIntersecting) {
-            el.classList.add("is-in");
-            io.disconnect();
-          }
+        if (entries[0].isIntersecting) {
+          el.classList.add("in");
+          io.disconnect();
         }
       },
       { threshold: 0.12 }
@@ -37,68 +34,14 @@ export function Reveal({
   );
 }
 
-/* ---------- count-up number ---------- */
+/* ---------- scramble-decode title ---------- */
 
-export function CountUp({
-  value,
-  decimals = 0,
-  suffix = "",
-  duration = 1100,
-  className = "",
-}: {
-  value: number;
-  decimals?: number;
-  suffix?: string;
-  duration?: number;
-  className?: string;
-}) {
-  const [display, setDisplay] = useState(0);
-  const ref = useRef<HTMLSpanElement>(null);
-  const started = useRef(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    if (prefersReducedMotion()) {
-      setDisplay(value);
-      return;
-    }
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (!entries.some((e) => e.isIntersecting) || started.current) return;
-        started.current = true;
-        const t0 = performance.now();
-        const tick = (t: number) => {
-          const p = Math.min(1, (t - t0) / duration);
-          const eased = 1 - Math.pow(1 - p, 3);
-          setDisplay(value * eased);
-          if (p < 1) requestAnimationFrame(tick);
-        };
-        requestAnimationFrame(tick);
-        io.disconnect();
-      },
-      { threshold: 0.4 }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [value, duration]);
-
-  return (
-    <span ref={ref} className={className}>
-      {display.toFixed(decimals)}
-      {suffix}
-    </span>
-  );
-}
-
-/* ---------- scramble-decode text ---------- */
-
-const GLYPHS = "ACGT01▓▒+×·";
+const GLYPHS = "█▓▒░<>/\\|=+*";
 
 export function Scramble({ text, className = "" }: { text: string; className?: string }) {
-  const [out, setOut] = useState(prefersReducedMotion() ? text : "");
+  const [out, setOut] = useState(text);
   useEffect(() => {
-    if (prefersReducedMotion()) {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setOut(text);
       return;
     }
@@ -106,83 +49,111 @@ export function Scramble({ text, className = "" }: { text: string; className?: s
     const total = 26;
     const id = window.setInterval(() => {
       frame++;
-      const solved = Math.floor((frame / total) * text.length);
-      let s = "";
-      for (let i = 0; i < text.length; i++) {
-        if (i < solved || text[i] === " ") s += text[i];
-        else s += GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
-      }
-      setOut(s);
+      const settled = Math.floor((frame / total) * text.length);
+      setOut(
+        text
+          .split("")
+          .map((ch, i) => {
+            if (ch === " ") return " ";
+            if (i < settled) return ch;
+            return GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
+          })
+          .join("")
+      );
       if (frame >= total) {
         setOut(text);
         window.clearInterval(id);
       }
-    }, 42);
+    }, 34);
     return () => window.clearInterval(id);
   }, [text]);
-  return <span className={className}>{out || "\u00A0"}</span>;
+  return <span className={className}>{out}</span>;
+}
+
+/* ---------- count-up number ---------- */
+
+export function CountUp({
+  value,
+  decimals = 0,
+  suffix = "",
+  className = "",
+}: {
+  value: number;
+  decimals?: number;
+  suffix?: string;
+  className?: string;
+}) {
+  const [v, setV] = useState(0);
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setV(value);
+      return;
+    }
+    let raf = 0;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0].isIntersecting) return;
+        io.disconnect();
+        const t0 = performance.now();
+        const dur = 1100;
+        const tick = (t: number) => {
+          const p = Math.min(1, (t - t0) / dur);
+          const eased = 1 - Math.pow(1 - p, 3);
+          setV(value * eased);
+          if (p < 1) raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+      },
+      { threshold: 0.3 }
+    );
+    io.observe(el);
+    return () => {
+      io.disconnect();
+      cancelAnimationFrame(raf);
+    };
+  }, [value]);
+  return (
+    <span ref={ref} className={className}>
+      {v.toFixed(decimals)}
+      {suffix}
+    </span>
+  );
 }
 
 /* ---------- ECG trace ---------- */
 
-function buildEcgPath(units: number, u = 160): string {
-  let d = "M0 36";
-  for (let i = 0; i < units; i++) {
-    d +=
-      " h30 l8 -6 l8 6 h10 l9 -24 l10 40 l9 -16 h14 l8 -10 l10 10 h44";
-  }
-  return d;
-}
-
-export function ECGLine({
-  className = "",
-  stroke = "currentColor",
-  slow = false,
-  units = 8,
-}: {
-  className?: string;
-  stroke?: string;
-  slow?: boolean;
-  units?: number;
-}) {
-  const width = units * 160;
-  const d = buildEcgPath(units);
+export function ECGLine({ className = "", slow = false }: { className?: string; slow?: boolean }) {
   return (
-    <svg
-      viewBox={`0 0 ${width} 64`}
-      preserveAspectRatio="none"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d={d} fill="none" stroke={stroke} strokeOpacity="0.22" strokeWidth="1.6" />
-      <path
-        d={d}
+    <svg viewBox="0 0 300 40" preserveAspectRatio="none" className={className} aria-hidden="true">
+      <polyline
+        points="0,22 36,22 44,22 50,8 56,34 62,22 96,22 104,22 110,12 116,30 122,22 158,22 166,22 172,4 178,36 184,22 220,22 228,22 234,14 240,28 246,22 300,22"
         fill="none"
-        stroke={stroke}
-        strokeWidth="2.2"
-        strokeLinecap="round"
+        stroke="currentColor"
+        strokeWidth="1.6"
         pathLength={100}
-        className={slow ? "ecg-trace-slow" : "ecg-trace"}
+        className={`ecg-trace ${slow ? "ecg-slow" : ""}`}
       />
     </svg>
   );
 }
 
-/* ---------- section heading ---------- */
+/* ---------- section tag ---------- */
 
-export function SectionTag({ children, tone = "teal" }: { children: ReactNode; tone?: "teal" | "alert" | "ink" }) {
-  const tones: Record<string, string> = {
-    teal: "bg-teal text-paper",
-    alert: "bg-alert text-paper",
-    ink: "bg-ink text-paper",
-  };
+export function SectionTag({
+  children,
+  tone = "teal",
+}: {
+  children: ReactNode;
+  tone?: "teal" | "alert" | "ink";
+}) {
+  const color = tone === "alert" ? "text-alert" : tone === "ink" ? "text-ink" : "text-teal";
   return (
-    <span
-      className={`inline-flex items-center gap-2 px-2.5 py-1 font-mono text-[11px] font-semibold tracking-[0.18em] uppercase ${tones[tone]}`}
-    >
-      <span className="inline-block h-1.5 w-1.5 bg-current blink-soft" />
-      {children}
-    </span>
+    <p className={`flex items-center gap-2 font-mono text-[10px] font-bold tracking-[0.28em] uppercase ${color}`}>
+      <span aria-hidden="true">✚</span> {children}
+    </p>
   );
 }
 

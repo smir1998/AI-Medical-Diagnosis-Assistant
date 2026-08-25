@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { nowTime } from "../lib/engine";
-import { Icon } from "./ui";
+import { CountUp, Icon } from "./ui";
 
 export interface DermFlag {
   key: string;
@@ -329,187 +329,178 @@ export function DermScan({ onDone, onPipeline }: Props) {
                       className="h-14 w-14 shrink-0 border border-ink/20 object-cover"
                     />
                     <span>
-                      <span className="block font-display text-[12px] font-extrabold leading-tight">{s.label}</span>
-                      <span className="mt-0.5 block font-mono text-[9px] tracking-wider text-inksoft">{s.tag}</span>
+                      <span className="block font-display text-[13px] font-extrabold">{s.label}</span>
+                      <span className="mt-0.5 block font-mono text-[9px] tracking-wider text-inksoft">
+                        {s.tag}
+                      </span>
                     </span>
                   </button>
                 ))}
               </div>
             </>
           ) : (
-            <div>
-              <div className="relative mx-auto max-w-md border-2 border-ink bg-pine p-2 shadow-[7px_7px_0_0_rgba(12,43,43,0.85)]">
-                <div className="relative aspect-square overflow-hidden">
-                  <img src={src.url} alt="Dermoscopy study" className="absolute inset-0 h-full w-full object-cover" />
-                  {/* ROI reticle */}
-                  <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full" aria-hidden="true">
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="30"
+            <>
+              <div className="dark-grid relative overflow-hidden border-2 border-pine">
+                {["top-2 left-2 border-t-2 border-l-2", "top-2 right-2 border-t-2 border-r-2", "bottom-2 left-2 border-b-2 border-l-2", "bottom-2 right-2 border-b-2 border-r-2"].map(
+                  (c) => (
+                    <span key={c} className={`absolute z-10 h-5 w-5 border-mint/70 ${c}`} />
+                  )
+                )}
+                <img
+                  src={src.url}
+                  alt={src.name}
+                  className="mx-auto max-h-[320px] w-auto max-w-full object-contain p-3"
+                  draggable={false}
+                />
+                {running && (
+                  <>
+                    <span className="scanline" />
+                    <svg
+                      className="reticle pointer-events-none absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 text-mint/70"
+                      viewBox="0 0 100 100"
                       fill="none"
-                      stroke="rgba(46,224,180,0.9)"
-                      strokeWidth="0.7"
-                      strokeDasharray="4 3"
-                      className={running && !reduced ? "animate-[spin_7s_linear_infinite] origin-center" : ""}
-                    />
-                    <path d="M50 12v10M50 78v10M12 50h10M78 50h10" stroke="rgba(46,224,180,0.55)" strokeWidth="0.6" />
-                  </svg>
-                  {running && !reduced && <div className="scanline" />}
-                  <span className="absolute left-2 top-2 bg-pine/85 px-2 py-1 font-mono text-[9px] tracking-[0.2em] text-mint">
-                    ROI · OTSU MASK
-                  </span>
-                  <span className="absolute bottom-2 right-2 bg-pine/85 px-2 py-1 font-mono text-[9px] tracking-wider text-mint">
-                    224×224 · ÷255
-                  </span>
-                </div>
+                    >
+                      <circle cx="50" cy="50" r="46" stroke="currentColor" strokeWidth="1" strokeDasharray="6 5" />
+                      <path d="M50 0v14M50 86v14M0 50h14M86 50h14" stroke="currentColor" strokeWidth="1" />
+                    </svg>
+                  </>
+                )}
+                <p className="border-t border-mint/15 px-3 py-2 text-center font-mono text-[10px] tracking-[0.18em] text-mint/60">
+                  {src.name.toUpperCase()}
+                </p>
               </div>
-              <div className="mx-auto mt-4 flex max-w-md flex-wrap items-center gap-2.5">
+              <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   onClick={analyze}
                   disabled={running}
-                  className="inline-flex flex-1 items-center justify-center gap-2 border-2 border-ink bg-alert px-4 py-2.5 font-mono text-[11px] font-bold uppercase tracking-wider text-paper transition-all duration-200 hover:-translate-y-0.5 hover:bg-alertdeep hover:shadow-[4px_4px_0_0_rgba(12,43,43,0.9)] disabled:cursor-wait disabled:opacity-60 disabled:hover:translate-y-0"
+                  className={`inline-flex items-center gap-2 px-5 py-2.5 font-display text-xs font-extrabold uppercase tracking-wider transition-all duration-200 ${
+                    running
+                      ? "cursor-not-allowed border border-ink/20 bg-paperdeep text-ink/40"
+                      : "bg-alert text-paper shadow-[4px_4px_0_0_rgba(11,47,45,1)] hover:-translate-y-0.5"
+                  }`}
                 >
-                  <Icon name={running ? "clock" : "scope"} className={`h-4 w-4 ${running && !reduced ? "animate-pulse" : ""}`} />
-                  {running ? "Analyzing…" : "Run CNN analysis"}
+                  {running ? (
+                    <>
+                      <Icon name="layers" className="h-3.5 w-3.5 spin-slow" /> Scanning…
+                    </>
+                  ) : (
+                    <>
+                      <Icon name="scope" className="h-3.5 w-3.5" /> Run dermoscopy CNN
+                    </>
+                  )}
                 </button>
                 <button
                   onClick={() => {
+                    if (running) return;
                     setSrc(null);
                     setResult(null);
                     setLogIdx(-1);
-                    probsRef.current = null;
                   }}
                   disabled={running}
-                  className="border border-ink/40 px-3.5 py-2.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-inksoft transition-colors hover:border-ink hover:text-ink disabled:opacity-50"
+                  className="inline-flex items-center gap-2 border border-ink/25 px-4 py-2.5 font-mono text-xs font-semibold text-inksoft transition-all duration-200 hover:border-ink hover:text-ink disabled:opacity-50"
                 >
-                  Replace
+                  <Icon name="x" className="h-3.5 w-3.5" /> Change photo
                 </button>
               </div>
-              <p className="mx-auto mt-2 max-w-md truncate text-center font-mono text-[10px] tracking-wider text-inksoft/70">
-                {src.name}
-              </p>
-            </div>
+            </>
           )}
         </div>
 
         {/* ---------- pipeline + results ---------- */}
-        <div className="min-w-0">
-          <div className="border border-pine bg-pine p-4">
-            <p className="mb-2.5 flex items-center justify-between font-mono text-[10px] tracking-[0.22em] text-mint/60">
-              <span>predict.py — dermoscopy pipeline</span>
-              {running && <span className="blink-soft text-mint">RUNNING</span>}
-            </p>
-            <ul className="space-y-1.5 font-mono text-[11px] leading-relaxed">
-              {PIPELINE_LOG.map((line, i) => {
-                const shown = i <= logIdx;
-                const active = i === logIdx && running;
-                return (
-                  <li
-                    key={line}
-                    className={`flex gap-2 transition-opacity duration-300 ${
-                      shown ? "opacity-100" : "opacity-25"
-                    }`}
-                  >
-                    <span className={shown ? "text-mint" : "text-mint/40"}>▸</span>
-                    <span className={active ? "blink-soft text-mint" : shown ? "text-mint/90" : "text-mint/40"}>
-                      {line}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
+        <div className="flex flex-col gap-4">
+          <div className="dark-grid min-h-[150px] border border-pine px-4 py-3 font-mono text-[11px] leading-relaxed text-mint">
+            {logIdx === -1 && !running && <span className="text-mint/40">// preprocessing trace …</span>}
+            {PIPELINE_LOG.slice(0, logIdx + 1).map((l, i) => (
+              <p key={i} className={i === logIdx && running ? "type-caret" : ""}>
+                ▸ {l}
+              </p>
+            ))}
           </div>
 
-          {result && rec ? (
-            <div className="mt-5 space-y-5">
-              {/* class probabilities */}
-              <div>
-                <p className="mb-2.5 font-mono text-[10px] font-bold tracking-[0.22em] text-inksoft">
-                  ── SOFTMAX OUTPUT · {result.time}
+          {!result && !running && (
+            <div className="border border-dashed border-ink/25 bg-paperdeep/40 p-4">
+              <p className="font-mono text-[10px] font-bold tracking-[0.22em] text-inksoft">
+                ── ABCDE RULE (WHAT THE MODEL CHECKS)
+              </p>
+              <ul className="mt-2.5 space-y-1.5 text-[13px] leading-relaxed text-inksoft">
+                <li><strong className="text-ink">A</strong>symmetry — one half unlike the other</li>
+                <li><strong className="text-ink">B</strong>order — irregular, notched or blurred edge</li>
+                <li><strong className="text-ink">C</strong>olor — mixed shades of brown / black / red</li>
+                <li><strong className="text-ink">D</strong>iameter — larger than 6 mm</li>
+                <li><strong className="text-ink">E</strong>volving — changing over weeks to months</li>
+              </ul>
+            </div>
+          )}
+
+          {result && rec && (
+            <div className="space-y-4">
+              <div className="border border-ink/20 bg-paperdeep/40 p-4">
+                <p className="mb-3 font-mono text-[10px] font-bold tracking-[0.22em] text-inksoft">
+                  3-CLASS RISK PROFILE · {result.time}
                 </p>
-                <div className="space-y-2.5">
-                  {[
-                    { label: "Benign nevus", v: result.benign, cls: "bg-teal", txt: "text-teal" },
-                    { label: "Atypical nevus", v: result.atypical, cls: "bg-amber", txt: "text-amber" },
-                    { label: "Melanoma pattern", v: result.melanoma, cls: "bg-alert", txt: "text-alert" },
-                  ].map((r) => (
-                    <div key={r.label}>
-                      <div className="mb-1 flex items-baseline justify-between">
-                        <span className="text-xs font-semibold">{r.label}</span>
-                        <span className={`font-mono text-sm font-bold tabular-nums ${r.txt}`}>
-                          {r.v.toFixed(1)}%
-                        </span>
-                      </div>
-                      <div className="h-2.5 bg-ink/10">
-                        <div className={`bar-fill h-full ${r.cls}`} style={{ width: `${r.v}%` }} />
-                      </div>
+                {[
+                  { label: "Benign pattern", v: result.benign, cls: "bg-teal", txt: "text-teal" },
+                  { label: "Atypical nevus", v: result.atypical, cls: "bg-amber", txt: "text-amber" },
+                  { label: "Melanoma pattern", v: result.melanoma, cls: "bg-alert", txt: "text-alert" },
+                ].map((row, i) => (
+                  <div key={row.label} className="mb-2.5 last:mb-0">
+                    <div className="mb-1 flex items-baseline justify-between">
+                      <span className="font-mono text-[11px] font-semibold">{row.label}</span>
+                      <CountUp
+                        value={row.v}
+                        decimals={1}
+                        suffix="%"
+                        className={`font-mono text-sm font-bold tabular-nums ${row.txt}`}
+                      />
                     </div>
-                  ))}
-                </div>
+                    <div className="h-2 bg-ink/10">
+                      <div
+                        className={`bar-fill h-full ${row.cls}`}
+                        style={{ width: `${row.v}%`, animationDelay: `${i * 130}ms` }}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
 
-              {/* ABCDE checklist */}
-              <div>
-                <p className="mb-2.5 font-mono text-[10px] font-bold tracking-[0.22em] text-inksoft">
-                  ── ABCDE RULE CHECK
-                </p>
-                <ul className="divide-y divide-ink/10 border border-ink/20">
-                  {result.flags.map((f) => (
-                    <li key={f.key} className="flex items-center gap-3 px-3 py-2 transition-colors hover:bg-paperdeep/60">
-                      <span
-                        className={`grid h-7 w-7 shrink-0 place-items-center border font-display text-sm font-black ${
-                          f.status === "warn" ? "border-amber bg-amber/15 text-ink" : "border-teal/50 bg-teal/10 text-teal"
-                        }`}
-                      >
-                        {f.key}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-xs font-semibold">{f.label}</span>
-                        <span className="block truncate font-mono text-[10px] text-inksoft">{f.note}</span>
-                      </span>
-                      {f.status === "warn" ? (
-                        <span className="flex items-center gap-1 font-mono text-[10px] font-bold tracking-wider text-alert">
-                          <Icon name="warn" className="h-3.5 w-3.5" /> CHECK
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 font-mono text-[10px] font-bold tracking-wider text-teal">
-                          <Icon name="check" className="h-3.5 w-3.5" /> LOW
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+              <div className="grid grid-cols-5 gap-1.5">
+                {result.flags.map((f) => (
+                  <div
+                    key={f.key}
+                    title={`${f.label}: ${f.note}`}
+                    className={`border p-2 text-center transition-all duration-200 hover:-translate-y-0.5 ${
+                      f.status === "warn" ? "border-alert/60 bg-alert/10" : "border-teal/40 bg-teal/5"
+                    }`}
+                  >
+                    <span
+                      className={`block font-display text-lg font-black ${
+                        f.status === "warn" ? "text-alert" : "text-teal"
+                      }`}
+                    >
+                      {f.key}
+                    </span>
+                    <span className="mt-0.5 block font-mono text-[8px] tracking-widest text-inksoft uppercase">
+                      {f.status === "warn" ? "flag" : "clear"}
+                    </span>
+                  </div>
+                ))}
               </div>
 
-              {/* recommendation */}
               <div className={`border-2 p-4 ${toneStyles[rec.tone]}`}>
-                <p className="font-display text-sm font-extrabold uppercase tracking-wide">{rec.title}</p>
-                <ul className="mt-2 space-y-1 font-mono text-[11px] leading-relaxed">
+                <p className="flex items-center gap-2 font-display text-xs font-extrabold uppercase tracking-wider">
+                  <Icon name={rec.tone === "ok" ? "check" : "warn"} className="h-4 w-4" />
+                  {rec.title}
+                </p>
+                <ul className="mt-2 space-y-1 pl-4 text-[13px] leading-relaxed">
                   {rec.lines.map((l) => (
-                    <li key={l} className="flex gap-1.5">
-                      <span className="font-bold">+</span> {l}
+                    <li key={l} className="list-disc">
+                      {l}
                     </li>
                   ))}
                 </ul>
               </div>
             </div>
-          ) : (
-            !running && (
-              <div className="mt-5 border border-dashed border-ink/25 px-4 py-6 text-center">
-                <Icon name="scope" className="mx-auto h-6 w-6 text-inksoft/50" />
-                <p className="mt-2 font-mono text-[11px] leading-relaxed text-inksoft/70">
-                  Load a lesion scan, then run the pipeline.
-                  <span className="block">Probabilities, ABCDE flags and triage advice appear here.</span>
-                </p>
-              </div>
-            )
           )}
-
-          <p className="mt-5 font-mono text-[10px] leading-relaxed text-inksoft/80">
-            ✚ Educational heuristic on pixel statistics — real deployment trains on ISIC-labelled
-            dermoscopy with clinician adjudication. Only a biopsy confirms or rules out melanoma.
-          </p>
         </div>
       </div>
     </div>

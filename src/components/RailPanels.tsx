@@ -1,58 +1,57 @@
-import { MODEL_CARDS, PIPELINE_STAGES } from "../data/medical";
-import { CountUp, Icon } from "./ui";
+import { useEffect, useState } from "react";
+import { PIPELINE_STAGES } from "../data/medical";
+import { Icon } from "./ui";
 
-/* ---------- pipeline ---------- */
+/* ---------- live system-architecture pipeline ---------- */
 
 export function PipelinePanel({ stage, running }: { stage: number; running: boolean }) {
   return (
-    <div className="dark-grid border border-pine p-4">
-      <p className="mb-3 flex items-center justify-between font-mono text-[10px] font-bold tracking-[0.22em] text-mint/70">
-        <span>SYSTEM ARCHITECTURE</span>
-        <span className={running ? "text-mint blink-soft" : "text-mint/35"}>
-          {running ? "● LIVE" : "○ IDLE"}
+    <div className="dark-grid border border-pine p-4 text-paper">
+      <p className="mb-3 flex items-center gap-2 font-mono text-[10px] font-bold tracking-[0.22em] text-mint/80">
+        <Icon name="layers" className="h-3.5 w-3.5" /> SYSTEM ARCHITECTURE
+        <span
+          className={`ml-auto inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] tracking-widest ${
+            running ? "bg-alert text-paper" : "bg-mint/15 text-mint"
+          }`}
+        >
+          <span className={`h-1.5 w-1.5 rounded-full ${running ? "blink-soft bg-paper" : "bg-mint"}`} />
+          {running ? "RUNNING" : "IDLE"}
         </span>
       </p>
+
       <ol className="space-y-0">
         {PIPELINE_STAGES.map((s, i) => {
-          const done = running && i < stage;
-          const active = running && i === stage;
+          const done = stage > i || (!running && stage >= 4);
+          const active = running && stage === i;
           return (
-            <li key={s.id}>
-              <div
-                className={`flex items-center gap-3 border px-3 py-2 transition-all duration-300 ${
+            <li key={s.id} className="relative pl-7 pb-3 last:pb-0">
+              {i < PIPELINE_STAGES.length - 1 && (
+                <span
+                  className={`absolute left-[9px] top-5 h-[calc(100%-14px)] w-px ${
+                    done ? "bg-mint/70" : "bg-mint/20"
+                  }`}
+                />
+              )}
+              <span
+                className={`absolute left-0 top-0.5 grid h-[19px] w-[19px] place-items-center border font-mono text-[9px] font-bold transition-all duration-300 ${
                   active
-                    ? "border-mint bg-mint/15 -translate-x-0 shadow-[3px_3px_0_0_rgba(127,216,200,0.25)]"
+                    ? "border-mint bg-mint text-pine shadow-[0_0_10px_rgba(143,227,207,0.8)]"
                     : done
-                      ? "border-mint/40 bg-mint/5"
-                      : "border-mint/15"
+                      ? "border-mint/70 bg-mint/15 text-mint"
+                      : "border-mint/25 text-mint/40"
                 }`}
               >
-                <span
-                  className={`grid h-6 w-6 shrink-0 place-items-center border font-mono text-[10px] font-bold ${
-                    active
-                      ? "border-mint bg-mint text-pine"
-                      : done
-                        ? "border-mint/60 text-mint"
-                        : "border-mint/25 text-mint/40"
-                  }`}
-                >
-                  {done ? <Icon name="check" className="h-3 w-3" /> : i + 1}
-                </span>
-                <span className="min-w-0">
-                  <span
-                    className={`block font-display text-xs font-bold uppercase tracking-wide ${
-                      active ? "text-mint" : done ? "text-paper" : "text-paper/55"
-                    }`}
-                  >
-                    {s.label}
-                  </span>
-                  <span className="block truncate font-mono text-[9px] text-mint/50">{s.detail}</span>
-                </span>
-                {active && <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-mint blink-soft" />}
-              </div>
-              {i < PIPELINE_STAGES.length - 1 && (
-                <div className="ml-[26px] h-3 w-px bg-mint/25" aria-hidden="true" />
-              )}
+                {done && !active ? "✓" : i + 1}
+              </span>
+              <p
+                className={`font-mono text-[11px] font-semibold leading-tight transition-colors duration-300 ${
+                  active ? "text-mint" : done ? "text-paper/90" : "text-paper/45"
+                }`}
+              >
+                {s.label}
+                {active && <span className="blink-soft ml-1">▮</span>}
+              </p>
+              <p className="font-mono text-[9px] tracking-wider text-paper/35">{s.detail}</p>
             </li>
           );
         })}
@@ -64,29 +63,55 @@ export function PipelinePanel({ stage, running }: { stage: number; running: bool
 /* ---------- model vitals ---------- */
 
 export function ModelVitals() {
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setTick((t) => t + 1), 2200);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const latency = 34 + ((tick * 7) % 13);
+  const gpu = 41 + ((tick * 11) % 17);
+  const uptime = 18400 + tick * 2;
+  const fmtUp = `${Math.floor(uptime / 3600)}h ${String(Math.floor((uptime % 3600) / 60)).padStart(2, "0")}m`;
+
+  const rows = [
+    { label: "PneumoNet v3", acc: 94.2 },
+    { label: "DermaScan", acc: 91.5 },
+    { label: "SymptomEncoder", acc: 88.4 },
+  ];
+
   return (
     <div className="border border-ink/20 bg-paper p-4">
       <p className="mb-3 flex items-center gap-2 font-mono text-[10px] font-bold tracking-[0.22em] text-inksoft">
-        <Icon name="pulse" className="h-3.5 w-3.5 text-alert" /> MODEL VITALS
+        <Icon name="pulse" className="h-3.5 w-3.5 text-teal" /> MODEL VITALS
+        <span className="ml-auto font-mono text-[9px] text-teal">uptime {fmtUp}</span>
       </p>
-      <div className="space-y-3">
-        {MODEL_CARDS.map((m) => (
-          <div key={m.name} className="group border border-ink/12 p-3 transition-all duration-300 hover:border-teal hover:-translate-y-0.5">
-            <p className="flex items-baseline justify-between">
-              <span className="font-display text-[13px] font-extrabold">{m.name}</span>
-              <CountUp value={m.acc} decimals={1} suffix="%" className="font-mono text-sm font-bold text-teal" />
-            </p>
-            <p className="font-mono text-[9px] tracking-wider text-inksoft/70">{m.arch}</p>
-            <div className="mt-2 h-1.5 bg-ink/10">
-              <div className="bar-fill h-full bg-teal" style={{ width: `${m.acc}%` }} />
+
+      <div className="space-y-2.5">
+        {rows.map((r) => (
+          <div key={r.label}>
+            <div className="flex justify-between font-mono text-[10px]">
+              <span className="font-semibold text-ink">{r.label}</span>
+              <span className="tabular-nums text-teal">{r.acc.toFixed(1)}%</span>
+            </div>
+            <div className="mt-1 h-1.5 bg-ink/10">
+              <div className="bar-fill h-full bg-teal" style={{ width: `${r.acc}%` }} />
             </div>
           </div>
         ))}
       </div>
-      <p className="mt-3 flex items-center justify-between border-t border-dashed border-ink/15 pt-2.5 font-mono text-[9px] tracking-widest text-inksoft">
-        <span>RECALL-FIRST TRIAGE</span>
-        <span className="text-teal font-bold">R 95.1</span>
-      </p>
+
+      <div className="mt-3.5 grid grid-cols-2 gap-2 border-t border-dashed border-ink/15 pt-3 font-mono text-[10px]">
+        <div className="border border-ink/10 bg-paperdeep/60 px-2 py-1.5">
+          <p className="text-[9px] tracking-widest text-inksoft/70">LATENCY</p>
+          <p className="tabular-nums font-bold text-ink">{latency} ms</p>
+        </div>
+        <div className="border border-ink/10 bg-paperdeep/60 px-2 py-1.5">
+          <p className="text-[9px] tracking-widest text-inksoft/70">GPU·SIM MEM</p>
+          <p className="tabular-nums font-bold text-ink">{gpu}%</p>
+        </div>
+      </div>
     </div>
   );
 }

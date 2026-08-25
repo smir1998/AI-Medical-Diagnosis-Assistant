@@ -1,17 +1,18 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TICKER_ITEMS } from "./data/medical";
 import type { ImageResult, SymptomResult } from "./lib/engine";
 import { nowTime } from "./lib/engine";
 import { StatusBar } from "./components/StatusBar";
 import { SymptomChecker } from "./components/SymptomChecker";
 import { ImageAnalysis } from "./components/ImageAnalysis";
-import { DermScan, type DermResult } from "./components/DermScan";
+import { DermScan } from "./components/DermScan";
+import type { DermResult } from "./components/DermScan";
 import { Chatbot } from "./components/Chatbot";
 import { ReportPanel } from "./components/ReportPanel";
 import { HistoryPanel, ModelVitals, PipelinePanel, type HistoryEntry } from "./components/RailPanels";
+import { Evaluation, FieldNotes, InsideModel } from "./components/InfoSections";
 import { QABench } from "./components/QABench";
 import { TEST_CASES } from "./lib/tests";
-import { Evaluation, FieldNotes, InsideModel } from "./components/InfoSections";
 import { CountUp, ECGLine, Icon, Reveal, Scramble, SectionTag, type IconName } from "./components/ui";
 
 type Tab = "symptoms" | "image" | "derm" | "chat";
@@ -29,8 +30,24 @@ export default function App() {
   const [symptomResult, setSymptomResult] = useState<SymptomResult | null>(null);
   const [imageResult, setImageResult] = useState<ImageResult | null>(null);
   const [dermResult, setDermResult] = useState<DermResult | null>(null);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [history, setHistory] = useState<HistoryEntry[]>(() => {
+    try {
+      const raw = localStorage.getItem("medlens-history");
+      const parsed = raw ? (JSON.parse(raw) as HistoryEntry[]) : [];
+      return Array.isArray(parsed) ? parsed.slice(0, 12) : [];
+    } catch {
+      return [];
+    }
+  });
   const [qaOpen, setQaOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("medlens-history", JSON.stringify(history.slice(0, 12)));
+    } catch {
+      /* storage unavailable — session-only log */
+    }
+  }, [history]);
 
   const onPipeline = (stage: number, running: boolean) => setPipeline({ stage, running });
 
@@ -117,10 +134,7 @@ export default function App() {
                   { k: "Disease profiles", v: 12, d: 0 },
                   { k: "Top-model acc.", v: 94.2, d: 1, suffix: "%" },
                 ].map((s) => (
-                  <div
-                    key={s.k}
-                    className="-ml-px -mt-px border border-ink/15 px-5 py-4"
-                  >
+                  <div key={s.k} className="border border-ink/15 px-5 py-4">
                     <dt className="font-mono text-[9px] tracking-[0.18em] text-inksoft uppercase">{s.k}</dt>
                     <dd className="mt-1 font-display text-2xl font-black tabular-nums text-ink">
                       <CountUp value={s.v} decimals={s.d} suffix={s.suffix ?? ""} />
@@ -157,7 +171,9 @@ export default function App() {
                   <button
                     key={t.id}
                     role="tab"
+                    id={`tab-${t.id}`}
                     aria-selected={active}
+                    aria-controls={`panel-${t.id}`}
                     onClick={() => setTab(t.id)}
                     className={`group relative -mb-px inline-flex items-center gap-2.5 border-2 px-4 py-3 text-left transition-all duration-200 ${
                       active
@@ -180,7 +196,12 @@ export default function App() {
               })}
             </div>
 
-            <div className="border-2 border-ink bg-paper p-5 shadow-[9px_9px_0_0_rgba(11,47,45,0.85)] sm:p-7">
+            <div
+              role="tabpanel"
+              id={`panel-${tab}`}
+              aria-labelledby={`tab-${tab}`}
+              className="border-2 border-ink bg-paper p-5 shadow-[9px_9px_0_0_rgba(11,47,45,0.85)] sm:p-7"
+            >
               {tab === "symptoms" && <SymptomChecker onComplete={onSymptomDone} onPipeline={onPipeline} />}
               {tab === "image" && <ImageAnalysis onComplete={onImageDone} onPipeline={onPipeline} />}
               {tab === "derm" && <DermScan onDone={onDermDone} onPipeline={onPipeline} />}
@@ -237,21 +258,21 @@ export default function App() {
                   )
                 )}
               </div>
+              <button
+                onClick={() => setQaOpen(true)}
+                className="group mt-5 inline-flex items-center gap-2 border border-mint/40 px-3.5 py-2 font-mono text-[11px] font-bold tracking-[0.18em] text-mint transition-all duration-200 hover:-translate-y-px hover:bg-mint hover:text-pine"
+              >
+                <Icon name="check" className="h-3 w-3" /> RUN QA BENCH · {TEST_CASES.length} CASES
+              </button>
               <p className="mt-5 font-mono text-[10px] leading-relaxed tracking-wider text-paper/40">
-                MEDLENS·AI — PROJECT #8 / AI CURRICULUM
+                MEDLENS·AI — DEEP LEARNING IN HEALTH CARE
                 <br />
                 ALL INFERENCE RUNS LOCALLY · NOTHING LEAVES YOUR BROWSER
               </p>
             </div>
           </div>
-          <div className="mt-10 flex flex-wrap items-center gap-4 border-t border-mint/15 pt-5">
-            <ECGLine className="h-6 min-w-[120px] flex-1 text-mint/60" />
-            <button
-              onClick={() => setQaOpen(true)}
-              className="inline-flex items-center gap-1.5 border border-mint/35 px-3 py-1.5 font-mono text-[10px] font-bold tracking-[0.2em] text-mint/85 transition-all duration-200 hover:-translate-y-px hover:bg-mint hover:text-pine"
-            >
-              <Icon name="check" className="h-3 w-3" /> RUN QA BENCH · {TEST_CASES.length} CASES
-            </button>
+          <div className="mt-10 flex items-center gap-4 border-t border-mint/15 pt-5">
+            <ECGLine className="h-6 flex-1 text-mint/60" />
             <span className="font-mono text-[10px] tracking-[0.24em] text-paper/40">© 2026 · EDUCATIONAL USE</span>
           </div>
         </div>

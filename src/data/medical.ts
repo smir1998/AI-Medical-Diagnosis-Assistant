@@ -233,14 +233,14 @@ export const CHAT_KB: ChatEntry[] = [
       "Accuracy = overall correctness. Precision = of predicted positives, how many were real. Recall = of real positives, how many we caught. In healthcare, recall matters most — missing pneumonia (a false negative) is more dangerous than an extra review (a false positive).",
   },
   {
+    keys: ["accurate", "reliable", "trust", "validated", "how good", "limits"],
+    answer:
+      "Honest answer: this console is a teaching simulation. Its numbers are deterministic and reproducible, but not clinically validated — the CNN figures shown (e.g. 94.2% accuracy) illustrate what published chest X-ray models achieve. Never treat its output as a diagnosis; it exists to teach the pipeline.",
+  },
+  {
     keys: ["doctor", "see a doctor", "urgent", "emergency", "hospital", "when to"],
     answer:
       "Seek urgent care for: chest pain, difficulty breathing, confusion, stiff neck with fever, oxygen saturation below 94%, dehydration, or any symptom that is severe or rapidly worsening. This tool is educational — it never replaces a clinician.",
-  },
-  {
-    keys: ["accurate", "reliable", "trust", "misdiagnose", "how good", "validated"],
-    answer:
-      "Validation-wise, PneumoNet v3 holds 94.2% accuracy with 95.1% recall on held-out studies — but this console runs deterministic teaching simulations, not those trained weights. Treat every output as a demonstration of the pipeline, never as a personal diagnosis; clinician review plus proper imaging is the only ground truth.",
   },
   {
     keys: ["fever"],
@@ -253,29 +253,14 @@ export const CHAT_KB: ChatEntry[] = [
       "For the image lab: upload a chest radiograph (JPG/PNG). The pipeline resizes it to 224×224, normalizes intensities, runs it through the CNN and returns Normal vs Pneumonia probabilities with a Grad-CAM style attention hotspot.",
   },
   {
-    keys: ["how", "predict", "work", "model", "algorithm"],
+    keys: ["how does", "how it works", "work", "architecture", "pipeline"],
     answer:
-      "Three heads: (1) a symptom encoder converts checked symptoms into a weighted feature vector and scores 12 disease profiles with a softmax head; (2) a CNN scores uploaded chest radiographs; (3) a dermoscopy CNN classifies skin lesions against the ABCDE rule. All are deterministic educational simulations of real clinical ML pipelines.",
+      "Four heads: (1) a symptom encoder converts checked symptoms into a weighted feature vector and scores 12 disease profiles with a softmax head; (2) a CNN scores uploaded chest radiographs; (3) a dermoscopy CNN classifies skin lesions against the ABCDE rule. All are deterministic educational simulations of real clinical ML pipelines.",
   },
   {
-    keys: ["accurate", "trust", "reliable", "real"],
+    keys: ["deploy", "streamlit", "fastapi", "render", "railway", "hugging"],
     answer:
-      "Honest answer: this is a teaching model with a small hand-built knowledge base — not a certified medical device. Real systems (e.g. FDA-cleared CXR triage tools) are validated on tens of thousands of studies. Use this to learn the workflow, not to self-diagnose.",
-  },
-  {
-    keys: ["privacy", "data", "stored", "upload safe"],
-    answer:
-      "Everything here runs in your browser. Symptoms and images are processed client-side in memory and never leave your device — nothing is uploaded or persisted.",
-  },
-  {
-    keys: ["cough"],
-    answer:
-      "A cough lasting under 3 weeks is usually viral. Hydration and honey (age 1+) help. See a doctor if you cough blood, have chest pain, shortness of breath, or the cough persists beyond 3 weeks.",
-  },
-  {
-    keys: ["hello", "hi ", "hey"],
-    answer:
-      "Hello! I'm the MedLens assistant. Ask me about CNNs, transfer learning, precision vs recall, when to seek care — or run the symptom / image labs and I can explain the output.",
+      "The curriculum path is Streamlit or FastAPI for a Python model server, deployed on Render, Railway or Hugging Face Spaces. This console is the same architecture shipped as a static React SPA on GitHub Pages — inference runs entirely in your browser.",
   },
 ];
 
@@ -313,35 +298,83 @@ export const MODEL_CARDS = [
     rec: 88.7,
     f1: 89.4,
   },
+  {
+    name: "SymptomEncoder",
+    arch: "MLP · 24-dim one-hot input",
+    dataset: "Tabular records, 6,000 rows",
+    acc: 88.9,
+    prec: 87.4,
+    rec: 90.2,
+    f1: 88.8,
+  },
+  {
+    name: "NLP-Triage",
+    arch: "DistilBERT · keyword fallback",
+    dataset: "12,000 Q&A pairs",
+    acc: 92.6,
+    prec: 91.8,
+    rec: 89.5,
+    f1: 90.6,
+  },
 ];
-
-export const CONFUSION = { tp: 412, fp: 34, fn: 21, tn: 533 };
 
 export const TRAINING_STEPS = [
-  { n: "01", title: "Load & decode", code: "image = cv2.imread('xray.jpg')", note: "OpenCV reads the radiograph as a NumPy array of shape (H, W, 3)." },
-  { n: "02", title: "Resize to 224×224", code: "image = cv2.resize(image, (224, 224))", note: "Fixed spatial size so batches stack into one tensor." },
-  { n: "03", title: "Normalize", code: "image = image / 255.0", note: "Scales pixels to [0,1] → faster training, better convergence." },
-  { n: "04", title: "Build the CNN", code: "Conv2D(32) → MaxPool → Flatten → Dense(128) → Dense(2, softmax)", note: "Filters learn opacity textures; softmax yields class probabilities." },
-  { n: "05", title: "Compile", code: "model.compile(optimizer='adam', loss='categorical_crossentropy')", note: "Adam adapts the learning rate per-parameter; cross-entropy fits probabilities." },
-  { n: "06", title: "Train & evaluate", code: "model.fit(X_train, y_train, epochs=10, validation_data=(X_test, y_test))", note: "The network learns disease patterns and reports accuracy per epoch." },
+  {
+    n: "01",
+    title: "Load & decode",
+    code: 'image = cv2.imread("xray.jpg")',
+    note: "OpenCV reads BGR channels; medical pipelines usually convert to grayscale or RGB before anything else.",
+  },
+  {
+    n: "02",
+    title: "Resize to the model's eye",
+    code: "image = cv2.resize(image, (224, 224))",
+    note: "The network expects a fixed tensor — every study, whatever its original size, becomes 224×224.",
+  },
+  {
+    n: "03",
+    title: "Normalize intensities",
+    code: "image = image / 255.0",
+    note: "Scales pixels to [0, 1]. Well-conditioned inputs ⇒ well-behaved gradients ⇒ faster, steadier convergence.",
+  },
+  {
+    n: "04",
+    title: "Build the CNN",
+    code: 'Conv2D(32, (3,3), activation="relu") + MaxPooling2D((2,2))',
+    note: "Convolutions learn edge → texture → clinical-pattern detectors; pooling compresses spatial dimensions.",
+  },
+  {
+    n: "05",
+    title: "Compile & train",
+    code: 'model.compile(optimizer="adam", loss="categorical_crossentropy")',
+    note: "Adam adapts the learning rate per weight; cross-entropy punishes confident wrong predictions hardest.",
+  },
+  {
+    n: "06",
+    title: "Predict with probabilities",
+    code: "model.predict(image)  # → Pneumonia: 92%, Normal: 8%",
+    note: "The softmax head turns logits into a probability distribution the report can quote honestly.",
+  },
 ];
+
+export const CONFUSION = { tp: 286, fp: 21, fn: 12, tn: 681 };
 
 export const FAQS = [
   {
-    q: "Q1 · What is a CNN?",
-    a: "A Convolutional Neural Network is a deep-learning architecture designed for image processing and computer vision. Stacked convolutional filters learn hierarchical features — from edges to the hazy consolidations radiologists read on a chest film.",
+    q: "What is a CNN?",
+    a: "A Convolutional Neural Network is a deep learning architecture designed for image processing and computer vision. Stacked convolutional filters learn hierarchical features — edges, then textures, then disease patterns like consolidation — and a dense head maps them to class probabilities.",
   },
   {
-    q: "Q2 · Why is normalization important?",
-    a: "It scales pixel values to a consistent range, improving training speed and model performance. Gradients stay well-conditioned, so Adam converges in fewer epochs without oscillating.",
+    q: "Why is normalization important?",
+    a: "It scales pixel values to a consistent range (÷255 → [0,1]), which improves training speed and model performance: gradients stay well-conditioned, so the optimizer converges in fewer epochs and is less sensitive to the learning rate.",
   },
   {
-    q: "Q3 · What is Transfer Learning?",
-    a: "Using a pre-trained model such as ResNet or MobileNet and fine-tuning it for a new task instead of training from scratch. Medical datasets are small — transfer learning borrows general visual knowledge learned from millions of natural images.",
+    q: "What is Transfer Learning?",
+    a: "Using a pre-trained model such as ResNet or MobileNet and fine-tuning it for a new task instead of training from scratch. The lower layers already know generic visual features, so medical models reach high accuracy with far fewer labelled scans.",
   },
   {
-    q: "Q4 · Why are Precision and Recall important in healthcare?",
-    a: "In medical applications, missing a disease (a false negative) can be more dangerous than a false positive, so recall is often the critical metric. A triage model should catch nearly every pneumonia, even if it means flagging a few healthy scans for review.",
+    q: "Why are Precision and Recall important in healthcare?",
+    a: "In medical applications, missing a disease (false negative) can be more dangerous than a false positive, so recall is often the critical metric. A triage model is tuned to catch nearly every pneumonia even if it means extra reviews for healthy scans.",
   },
 ];
 

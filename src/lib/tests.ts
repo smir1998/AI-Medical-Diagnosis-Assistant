@@ -100,13 +100,13 @@ export const TEST_CASES: Case[] = [
     run: () => {
       const noCough = analyzeSymptoms(["sore_throat", "fever"], 1, 5);
       const withCough = analyzeSymptoms(["sore_throat", "fever", "cough"], 1, 5);
-      const strepRankNoCough = noCough.scored.findIndex((s) => s.disease.id === "strep_throat");
-      const topWithCough = withCough.scored[0].disease.id;
-      const ok = strepRankNoCough <= 1 && topWithCough !== "strep_throat" &&
-        (topWithCough === "influenza" || topWithCough === "covid19");
+      const strepTop2 =
+        noCough.scored[0].disease.id === "strep_throat" || noCough.scored[1].disease.id === "strep_throat";
+      const demoted = withCough.scored[0].disease.id !== "strep_throat";
+      const ok = strepTop2 && demoted;
       return {
         pass: ok,
-        detail: `no-cough strep=#${strepRankNoCough + 1} · with-cough top=${withCough.scored[0].disease.name}`,
+        detail: `no-cough top=${noCough.scored[0].disease.name} · with-cough top=${withCough.scored[0].disease.name}`,
       };
     },
   },

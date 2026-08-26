@@ -4,7 +4,7 @@
 /* ------------------------------------------------------------------ */
 
 import { analyzeSymptoms, predictImage, prefersReducedMotion } from "./engine";
-import { CHAT_FALLBACK, HF_MODEL_ZOO } from "../data/medical";
+import { CHAT_FALLBACK, HF_MODEL_ZOO, TICKER_ITEMS } from "../data/medical";
 import { matchAnswer } from "../components/Chatbot";
 import { analyzePixels, buildFlags } from "../components/DermScan";
 import {
@@ -402,6 +402,67 @@ export const TEST_CASES: Case[] = [
         pass: ok,
         detail: `vision=${vision} · nlp=${tags.includes("nlp")} · llm=${tags.includes("llm")} · mm=${tags.includes("multimodal")}`,
       };
+    },
+  },
+  {
+    id: "M3",
+    suite: "MODEL ZOO",
+    name: "Registry has no duplicate repo ids and each backs a named console head",
+    run: () => {
+      const ids = HF_MODEL_ZOO.map((m) => m.repoId);
+      const unique = new Set(ids).size === ids.length;
+      const rolesOk = HF_MODEL_ZOO.every((m) => m.role.trim().length > 0);
+      return {
+        pass: unique && rolesOk,
+        detail: `${ids.length} entries · unique=${unique} · roles-set=${rolesOk}`,
+      };
+    },
+  },
+  {
+    id: "M4",
+    suite: "MODEL ZOO",
+    name: "Every tag is a known category and every params field looks numeric",
+    run: () => {
+      const known = new Set(["vision", "nlp", "llm", "multimodal"]);
+      const bad = HF_MODEL_ZOO.find((m) => !known.has(m.tag) || !/\d/.test(m.params));
+      return {
+        pass: !bad,
+        detail: bad ? `bad entry: ${bad.repoId} (tag=${bad.tag}, params=${bad.params})` : "all tags valid, all params numeric",
+      };
+    },
+  },
+  {
+    id: "M5",
+    suite: "MODEL ZOO",
+    name: "Ticker's 'verified HF Hub models' count stays in sync with the registry",
+    run: () => {
+      const line = TICKER_ITEMS.find((t) => t.includes("verified HF Hub models"));
+      const n = line ? parseInt(line.match(/(\d+)\s+verified/)?.[1] ?? "-1", 10) : -1;
+      const ok = !!line && n === HF_MODEL_ZOO.length;
+      return {
+        pass: ok,
+        detail: line ? `ticker says ${n} · registry has ${HF_MODEL_ZOO.length}` : "no ticker line found",
+      };
+    },
+  },
+  {
+    id: "M6",
+    suite: "MODEL ZOO",
+    name: "'Hugging' now routes to the Model Registry answer, not the deploy answer",
+    run: () => {
+      const a = matchAnswer("Tell me about the Hugging Face models you use.");
+      const ok = a !== CHAT_FALLBACK && a.includes("Model Registry") && !a.includes("Streamlit");
+      return { pass: ok, detail: ok ? "matched: HF registry explainer" : `got: ${a.slice(0, 60)}…` };
+    },
+  },
+  {
+    id: "M7",
+    suite: "MODEL ZOO",
+    name: "Deploy question (no 'hugging' keyword) still matches the deploy answer",
+    run: () => {
+      const a = matchAnswer("How do I deploy this with Streamlit or Render?");
+      const ok = a.includes("Render") && !a.includes("Model Registry");
+      return { pass: ok, detail: ok ? "matched: deploy explainer" : `got: ${a.slice(0, 60)}…` };
     },
   },
 ];

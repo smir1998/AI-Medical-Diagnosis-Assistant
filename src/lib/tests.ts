@@ -42,7 +42,15 @@ type Run = () => { pass: boolean; detail: string } | Promise<{ pass: boolean; de
 
 interface Case {
   id: string;
-  suite: "SYMPTOM NLP" | "RADIOLOGY CNN" | "NLP DESK" | "DERM SCREEN" | "REGISTRAR" | "MODEL ZOO" | "SEMANTIC UTILS";
+  suite:
+    | "SYMPTOM NLP"
+    | "RADIOLOGY CNN"
+    | "NLP DESK"
+    | "DERM SCREEN"
+    | "REGISTRAR"
+    | "MODEL ZOO"
+    | "SEMANTIC UTILS"
+    | "BUNDLE";
   name: string;
   run: Run;
 }
@@ -387,6 +395,18 @@ export const TEST_CASES: Case[] = [
       return {
         pass: !bad && HF_MODEL_ZOO.length >= 5,
         detail: bad ? `invalid entry: ${bad.repoId}` : `${HF_MODEL_ZOO.length}/5 entries well-formed`,
+      };
+    },
+  },
+  {
+    id: "B1",
+    suite: "BUNDLE",
+    name: "Sample radiographs ship as bundled assets, never remote URLs",
+    run: () => {
+      const remote = [SAMPLE_XRAY_PNEUMONIA, SAMPLE_XRAY_NORMAL].filter((u) => /^https?:/i.test(u));
+      return {
+        pass: remote.length === 0,
+        detail: remote.length === 0 ? "both studies resolve locally (no ❌ hosts)" : `remote ref: ${remote[0]}`,
       };
     },
   },

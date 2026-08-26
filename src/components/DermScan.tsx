@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
 import { nowTime } from "../lib/engine";
 import { Icon } from "./ui";
+import dermBenign from "../assets/derm-benign.svg";
+import dermAtypical from "../assets/derm-atypical.svg";
 
 export interface DermFlag {
   key: string;
@@ -36,20 +38,24 @@ const STAGE_MAP = [1, 1, 2, 2, 3, 4];
 
 const SAMPLES = [
   {
-    name: "derm-nevus-benign.png",
-    url: "https://image.qwenlm.ai/generated-images/32e40f52-943e-4609-a79b-53e39c1deed5/_result.png",
+    name: "derm-nevus-benign.svg",
+    url: dermBenign,
     label: "Common nevus",
     tag: "expected: benign",
     probs: { benign: 88, atypical: 9, melanoma: 3 },
   },
   {
-    name: "derm-lesion-atypical.png",
-    url: "https://image.qwenlm.ai/generated-images/ac0e055d-d141-406e-acfc-64c4ddd2b1bd/_result.png",
+    name: "derm-lesion-atypical.svg",
+    url: dermAtypical,
     label: "Atypical lesion",
     tag: "expected: flagged",
     probs: { benign: 12, atypical: 41, melanoma: 47 },
   },
 ];
+
+/** Styled fallback tile if a study ever fails to decode — no broken-image glyphs. */
+const NO_SIGNAL_TILE =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Crect width='120' height='120' fill='%2307211e'/%3E%3Cpath d='M32 32l56 56M88 32L32 88' stroke='%23c7463c' stroke-width='7' stroke-linecap='round'/%3E%3Ctext x='60' y='106' text-anchor='middle' font-family='monospace' font-size='11' fill='%238fe3cf' opacity='0.7'%3ENO SIGNAL%3C/text%3E%3C/svg%3E";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const reduced =
@@ -326,6 +332,9 @@ export function DermScan({ onDone, onPipeline }: Props) {
                       src={s.url}
                       alt={s.label}
                       loading="lazy"
+                      onError={(e) => {
+                        e.currentTarget.src = NO_SIGNAL_TILE;
+                      }}
                       className="h-14 w-14 shrink-0 border border-ink/20 object-cover"
                     />
                     <span className="min-w-0">
@@ -341,7 +350,21 @@ export function DermScan({ onDone, onPipeline }: Props) {
             </>
           ) : (
             <div className="dark-grid relative overflow-hidden border-2 border-pine">
-              <img src={src.url} alt={src.name} className="mx-auto max-h-[380px] w-auto object-contain" draggable={false} />
+              <img
+                src={src.url}
+                alt={src.name}
+                onError={(e) => {
+                  e.currentTarget.src = NO_SIGNAL_TILE;
+                }}
+                className="mx-auto max-h-[380px] w-auto object-contain"
+                draggable={false}
+              />
+              <p className="px-3 pb-2 text-center font-mono text-[9px] tracking-[0.22em] text-mint/60">
+                {src.name.toUpperCase()}
+                {SAMPLES.some((s) => s.url === src.url) && (
+                  <span className="text-amber"> · SYNTHETIC TEACHING STUDY</span>
+                )}
+              </p>
               {running && <span className="scanline" />}
               {running && (
                 <svg viewBox="0 0 100 100" className="reticle pointer-events-none absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 text-mint">

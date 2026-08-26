@@ -20,6 +20,7 @@ export function ImageAnalysis({ onComplete, onPipeline }: Props) {
   const [result, setResult] = useState<ImageResult | null>(null);
   const [fileErr, setFileErr] = useState<string | null>(null);
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
+  const [imgFailed, setImgFailed] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const alive = useRef(true);
 
@@ -36,6 +37,7 @@ export function ImageAnalysis({ onComplete, onPipeline }: Props) {
     setResult(null);
     setLogIdx(-1);
     setDims(null);
+    setImgFailed(false);
     setSource(kind);
     setFileName(kind === "pneumonia-sample" ? "PA_chest_0412.dcm.png" : "PA_chest_0107.dcm.png");
     setSeedKey(String(Date.now()));
@@ -53,6 +55,7 @@ export function ImageAnalysis({ onComplete, onPipeline }: Props) {
       setResult(null);
       setLogIdx(-1);
       setDims(null);
+      setImgFailed(false);
       setSource("upload");
       setFileName(file.name);
       setSeedKey(`${file.size}-${file.name}`);
@@ -156,15 +159,28 @@ export function ImageAnalysis({ onComplete, onPipeline }: Props) {
 
           {imgSrc ? (
             <div className="relative w-full p-4">
-              <img
-                src={imgSrc}
-                alt={fileName || "Chest radiograph"}
-                onLoad={(e) =>
-                  setDims({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })
-                }
-                className="mx-auto max-h-[340px] w-auto max-w-full border border-mint/25 object-contain"
-                draggable={false}
-              />
+              {imgFailed ? (
+                <div className="mx-auto grid max-w-sm place-items-center border border-alert/40 bg-alert/10 px-6 py-10 text-center">
+                  <Icon name="warn" className="h-8 w-8 text-alert" />
+                  <p className="mt-3 font-mono text-[10px] font-bold tracking-[0.24em] text-alert">
+                    STUDY BUFFER LOST
+                  </p>
+                  <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-paper/50">
+                    The image could not be decoded. Load a sample study or drop another radiograph.
+                  </p>
+                </div>
+              ) : (
+                <img
+                  src={imgSrc}
+                  alt={fileName || "Chest radiograph"}
+                  onLoad={(e) =>
+                    setDims({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })
+                  }
+                  onError={() => setImgFailed(true)}
+                  className="mx-auto max-h-[340px] w-auto max-w-full border border-mint/25 object-contain"
+                  draggable={false}
+                />
+              )}
               {running && <span className="scanline" />}
               {result && !running && (
                 <span
@@ -185,6 +201,7 @@ export function ImageAnalysis({ onComplete, onPipeline }: Props) {
               )}
               <p className="mt-2 text-center font-mono text-[10px] tracking-[0.2em] text-mint/60">
                 {fileName.toUpperCase() || "AWAITING STUDY"}
+                {source !== "upload" && <span className="text-amber"> · SYNTHETIC TEACHING STUDY</span>}
                 {dims && <span className="text-mint"> · {dims.w}×{dims.h}px</span>} · DROP OR BROWSE TO REPLACE
               </p>
             </div>

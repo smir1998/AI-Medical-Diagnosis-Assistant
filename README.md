@@ -4,7 +4,7 @@
 > X-ray CNN, a dermoscopy classifier and a medical NLP desk into one decision-support console.
 
 [![Live on GitHub Pages](https://img.shields.io/badge/LIVE-GitHub%20Pages-0e7c72)](https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/)
-[![QA Bench](https://img.shields.io/badge/QA-28%20cases%20in--browser-16241f)](https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/)
+[![QA Bench](https://img.shields.io/badge/QA-29%20cases%20in--browser-16241f)](https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-a16207.svg)](LICENSE)
 
 ⚠️ **Educational simulation only.** MedLens is a learning tool — its predictions are deterministic

@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Synthetic teaching dermoscopy view of a benign common nevus">
+  <defs>
+    <radialGradient id="skin" cx="50%" cy="46%" r="72%">
+      <stop offset="0%" stop-color="#e0b183"/>
+      <stop offset="70%" stop-color="#cf9d6e"/>
+      <stop offset="100%" stop-color="#b9855a"/>
+    </radialGradient>
+    <radialGradient id="nevus" cx="46%" cy="42%" r="60%">
+      <stop offset="0%" stop-color="#6e4526"/>
+      <stop offset="55%" stop-color="#57351c"/>
+      <stop offset="100%" stop-color="#3c2210"/>
+    </radialGradient>
+    <radialGradient id="vig" cx="50%" cy="50%" r="50%">
+      <stop offset="60%" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="92%" stop-color="#000000" stop-opacity="0.88"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.96"/>
+    </radialGradient>
+    <filter id="pore">
+      <feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="2" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.35  0 0 0 0 0.22  0 0 0 0 0.12  0 0 0 0.10 0"/>
+    </filter>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+  </defs>
+
+  <!-- skin -->
+  <rect width="512" height="512" fill="url(#skin)"/>
+  <rect width="512" height="512" filter="url(#pore)"/>
+
+  <!-- benign nevus: symmetric, smooth border, uniform pigment -->
+  <circle cx="256" cy="252" r="86" fill="url(#nevus)" filter="url(#soft)"/>
+  <circle cx="256" cy="252" r="86" fill="none" stroke="#31200f" stroke-width="3" opacity="0.5" filter="url(#soft)"/>
+
+  <!-- faint pigment network -->
+  <g stroke="#8a6238" stroke-width="2" fill="none" opacity="0.45" filter="url(#soft)">
+    <path d="M200 226 Q232 210 262 222 Q292 234 310 258"/>
+    <path d="M196 258 Q228 244 258 254 Q290 264 312 286"/>
+    <path d="M210 292 Q240 278 270 286 Q296 294 306 310"/>
+    <path d="M226 206 Q250 236 246 268 Q242 296 252 322"/>
+    <path d="M268 200 Q282 232 280 264 Q278 294 290 316"/>
+  </g>
+
+  <!-- terminal hair -->
+  <path d="M214 176 Q262 250 238 336" stroke="#241708" stroke-width="4.5" fill="none" opacity="0.55" filter="url(#soft)"/>
+
+  <!-- dermoscope vignette + lens ring -->
+  <rect width="512" height="512" fill="url(#vig)"/>
+  <circle cx="256" cy="256" r="216" fill="none" stroke="#0b0b0b" stroke-width="30"/>
+  <circle cx="256" cy="256" r="200" fill="none" stroke="#4a4a4a" stroke-width="2" opacity="0.8"/>
+
+  <!-- lens glare -->
+  <ellipse cx="182" cy="142" rx="62" ry="20" fill="#ffffff" opacity="0.10" transform="rotate(-24 182 142)"/>
+</svg>

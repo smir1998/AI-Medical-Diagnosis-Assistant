@@ -297,7 +297,13 @@ export default function App() {
               aria-labelledby={`tab-${tab}`}
               className="border-2 border-ink bg-paper p-5 shadow-[9px_9px_0_0_rgba(11,47,45,0.85)] sm:p-7"
             >
-              {tab === "symptoms" && <SymptomChecker onComplete={onSymptomDone} onPipeline={onPipeline} />}
+              {tab === "symptoms" && (
+                <SymptomChecker
+                  onComplete={onSymptomDone}
+                  onPipeline={onPipeline}
+                  chiefComplaint={activePatient?.complaint}
+                />
+              )}
               {tab === "image" && <ImageAnalysis onComplete={onImageDone} onPipeline={onPipeline} />}
               {tab === "derm" && <DermScan onDone={onDermDone} onPipeline={onPipeline} />}
               {tab === "chat" && <Chatbot />}

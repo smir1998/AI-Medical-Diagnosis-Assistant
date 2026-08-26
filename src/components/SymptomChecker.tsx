@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DURATIONS, SYMPTOMS, SYMPTOM_GROUPS } from "../data/medical";
 import { analyzeSymptoms, prefersReducedMotion, sleep } from "../lib/engine";
 import type { SymptomResult } from "../lib/engine";
@@ -45,12 +45,44 @@ const PRESETS: { label: string; note: string; ids: string[]; durationIdx: number
   },
 ];
 
+/* keyword map: chief-complaint free text → symptom ids */
+const CC_HINTS: { re: RegExp; ids: string[] }[] = [
+  { re: /fever|febrile|temp|chill/i, ids: ["fever", "chills"] },
+  { re: /cough/i, ids: ["cough"] },
+  { re: /throat/i, ids: ["sore_throat"] },
+  { re: /head|migraine/i, ids: ["headache"] },
+  { re: /breath|wheeze|asthma/i, ids: ["shortness_breath"] },
+  { re: /chest/i, ids: ["chest_pain"] },
+  { re: /stomach|abdom|tummy|belly|cramp/i, ids: ["abdominal_pain"] },
+  { re: /vomit|throw/i, ids: ["vomiting"] },
+  { re: /nausea|queasy/i, ids: ["nausea"] },
+  { re: /diarr|loose/i, ids: ["diarrhea"] },
+  { re: /rash/i, ids: ["rash"] },
+  { re: /itch/i, ids: ["itching"] },
+  { re: /urin|pee|dysuria/i, ids: ["burning_urination"] },
+  { re: /joint/i, ids: ["joint_pain"] },
+  { re: /muscle|ache/i, ids: ["muscle_aches"] },
+  { re: /dizz|vertigo|faint/i, ids: ["dizziness"] },
+  { re: /tired|fatigue|weak|exhaust/i, ids: ["fatigue"] },
+  { re: /nose|sneez|allerg|hay/i, ids: ["runny_nose", "sneezing"] },
+  { re: /sweat/i, ids: ["night_sweats"] },
+  { re: /weight/i, ids: ["weight_loss"] },
+  { re: /taste|smell/i, ids: ["loss_taste"] },
+];
+
+export function ccToSymptoms(cc: string): string[] {
+  const out = new Set<string>();
+  for (const h of CC_HINTS) if (h.re.test(cc)) h.ids.forEach((i) => out.add(i));
+  return [...out];
+}
+
 interface Props {
   onComplete: (r: SymptomResult) => void;
   onPipeline: (stage: number, running: boolean) => void;
+  chiefComplaint?: string;
 }
 
-export function SymptomChecker({ onComplete, onPipeline }: Props) {
+export function SymptomChecker({ onComplete, onPipeline, chiefComplaint }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set(["fever", "cough", "fatigue"]));
   const [durationIdx, setDurationIdx] = useState(1);
   const [severity, setSeverity] = useState(5);
@@ -65,6 +97,17 @@ export function SymptomChecker({ onComplete, onPipeline }: Props) {
       alive.current = false;
     };
   }, []);
+
+  const ccMatches = useMemo(
+    () => (chiefComplaint && chiefComplaint !== "—" ? ccToSymptoms(chiefComplaint) : []),
+    [chiefComplaint]
+  );
+
+  const applyCc = () => {
+    if (running || ccMatches.length === 0) return;
+    setSelected((prev) => new Set([...prev, ...ccMatches]));
+    setResult(null);
+  };
 
   const toggle = (id: string) => {
     if (running) return;
@@ -112,6 +155,24 @@ export function SymptomChecker({ onComplete, onPipeline }: Props) {
 
   return (
     <div className="space-y-6">
+      {/* chart cross-link — pulls symptoms from the active patient's chief complaint */}
+      {ccMatches.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-2 border-teal/45 bg-teal/10 px-3.5 py-2.5">
+          <Icon name="stetho" className="h-4 w-4 shrink-0 text-teal" />
+          <span className="min-w-0 font-mono text-[10px] leading-relaxed tracking-wider text-inksoft">
+            CHART CC <span className="font-bold text-ink">“{chiefComplaint}”</span> → {ccMatches.length} matching
+            symptom{ccMatches.length > 1 ? "s" : ""} in the 24-dim vector
+          </span>
+          <button
+            onClick={applyCc}
+            disabled={running}
+            className="ml-auto inline-flex shrink-0 items-center gap-1.5 border border-teal bg-paper px-2.5 py-1 font-mono text-[9px] font-bold tracking-[0.18em] text-teal transition-all duration-200 hover:-translate-y-px hover:bg-teal hover:text-paper disabled:opacity-40"
+          >
+            <Icon name="arrow" className="h-3 w-3" /> PULL INTO VECTOR
+          </button>
+        </div>
+      )}
+
       {/* scenario presets */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-mono text-[10px] font-bold tracking-[0.22em] text-inksoft uppercase">

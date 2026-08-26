@@ -7,6 +7,27 @@ import { analyzeSymptoms, predictImage, prefersReducedMotion } from "./engine";
 import { CHAT_FALLBACK } from "../data/medical";
 import { matchAnswer } from "../components/Chatbot";
 import { analyzePixels, buildFlags } from "../components/DermScan";
+import {
+  computeVitalsFlags,
+  toCSV,
+  validateIntake,
+  type IntakeDraft,
+} from "../components/PatientRegistry";
+
+const intakeDraft = (over: Partial<IntakeDraft> = {}): IntakeDraft => ({
+  name: "Ada Lovelace",
+  age: "36",
+  sex: "F",
+  complaint: "fever, cough 3 days",
+  allergies: "Penicillin",
+  triage: 3,
+  hr: "88",
+  sys: "118",
+  dia: "76",
+  spo2: "97",
+  temp: "37.2",
+  ...over,
+});
 
 export interface CaseResult {
   id: string;
@@ -20,7 +41,7 @@ type Run = () => { pass: boolean; detail: string } | Promise<{ pass: boolean; de
 
 interface Case {
   id: string;
-  suite: "SYMPTOM NLP" | "RADIOLOGY CNN" | "NLP DESK" | "DERM SCREEN";
+  suite: "SYMPTOM NLP" | "RADIOLOGY CNN" | "NLP DESK" | "DERM SCREEN" | "REGISTRAR";
   name: string;
   run: Run;
 }
@@ -293,6 +314,59 @@ export const TEST_CASES: Case[] = [
       const b = flags.find((f) => f.key === "B")!;
       const ok = a.status === "warn" && b.status === "warn";
       return { pass: ok, detail: `A=${a.status} · B=${b.status} · flagged=${flags.filter((f) => f.status === "warn").length}/5` };
+    },
+  },
+
+  /* ----- R · registrar ----- */
+  {
+    id: "R1",
+    suite: "REGISTRAR",
+    name: "Invalid intake rejected: empty name, age 999, SpO₂ 140",
+    run: () => {
+      const { errors, patient } = validateIntake(intakeDraft({ name: "", age: "999", spo2: "140" }));
+      const ok = patient === null && !!errors.name && !!errors.age && !!errors.spo2;
+      return { pass: ok, detail: `errors=[${Object.keys(errors).join(",")}] · patient=${patient ?? "null"}` };
+    },
+  },
+  {
+    id: "R2",
+    suite: "REGISTRAR",
+    name: "Valid intake → MRN issued, vitals parsed, triage kept",
+    run: () => {
+      const { errors, patient } = validateIntake(intakeDraft());
+      const ok =
+        patient !== null &&
+        Object.keys(errors).length === 0 &&
+        patient.id.startsWith("MRN-") &&
+        patient.vitals.hr === 88 &&
+        patient.vitals.spo2 === 97 &&
+        patient.triage === 3;
+      return {
+        pass: ok,
+        detail: patient ? `id=${patient.id} · hr=${patient.vitals.hr} · T${patient.triage}` : "no patient",
+      };
+    },
+  },
+  {
+    id: "R3",
+    suite: "REGISTRAR",
+    name: "Vitals flag engine: hypoxia + tachycardia + febrile all fire",
+    run: () => {
+      const flags = computeVitalsFlags({ spo2: 88, hr: 132, temp: 38.6 });
+      const ok = flags.includes("Hypoxia") && flags.includes("Tachycardia") && flags.includes("Febrile");
+      return { pass: ok, detail: `flags=[${flags.join(", ")}]` };
+    },
+  },
+  {
+    id: "R4",
+    suite: "REGISTRAR",
+    name: "CSV export: header present, commas escaped (RFC-4180)",
+    run: () => {
+      const { patient } = validateIntake(intakeDraft());
+      if (!patient) return { pass: false, detail: "could not build patient" };
+      const csv = toCSV([patient]);
+      const ok = csv.startsWith('"MRN"') && csv.includes('"fever, cough 3 days"');
+      return { pass: ok, detail: ok ? "header + escaped field ok" : `csv head=${csv.slice(0, 40)}…` };
     },
   },
 ];

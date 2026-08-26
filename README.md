@@ -4,7 +4,7 @@
 > X-ray CNN, a dermoscopy classifier and a medical NLP desk into one decision-support console.
 
 [![Live on GitHub Pages](https://img.shields.io/badge/LIVE-GitHub%20Pages-0e7c72)](https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/)
-[![QA Bench](https://img.shields.io/badge/QA-20%20cases%20in--browser-16241f)](https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/)
+[![QA Bench](https://img.shields.io/badge/QA-24%20cases%20in--browser-16241f)](https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-a16207.svg)](LICENSE)
 
 ⚠️ **Educational simulation only.** MedLens is a learning tool — its predictions are deterministic
@@ -18,13 +18,13 @@ toy-model outputs, not clinical diagnoses. Never use it as a substitute for prof
 
 | Module | Technique | What it does |
 | --- | --- | --- |
-| **Registrar** | On-device admission log (localStorage) | Patient intake form (name, age, sex, chief complaint, allergies, CTAS triage 1–5), auto-issued MRNs, chart/discharge workflow — the active patient is stamped onto every report |
+| **Registrar** | On-device admission log (localStorage) | Intake form (name, age, sex, chief complaint, allergies, CTAS triage 1–5, HR/BP/SpO₂/temp vitals), auto-issued MRNs, clinical flag engine (hypoxia, tachycardia, febrile…), CSV export, chart/discharge workflow — the active patient is stamped onto every report and its CC pre-fills the symptom vector |
 | **Symptom Lab** | NLP-encoded feature vector → softmax over 12 disease profiles | Differential diagnosis with confidence, ICD-10 codes, severity tiers, red-flag rules |
 | **Radiology Lab** | Simulated CNN (Conv→Pool→Dense→softmax) with Grad-CAM-style hotspot | Pneumonia vs Normal classification on uploaded or sample chest X-rays |
 | **Derm Scan** | CLAHE → Otsu ROI → 3-class EfficientNet-style head + ABCDE rule engine | Benign / atypical / melanoma-pattern screening with pixel-statistics heuristic |
 | **NLP Desk** | Keyword-weighted medical Q&A | Answers CNN / normalization / transfer-learning / precision-recall questions |
 | **Report Engine** | Multi-modal report compilation | Printable patient analysis report (Print → PDF), referral recommendations |
-| **QA Bench** | 20-case in-browser regression suite | Tests the live engine: softmax invariants, red-flag rules, determinism, edge cases |
+| **QA Bench** | 24-case in-browser regression suite | Tests the live engine: softmax invariants, red-flag rules, determinism, edge cases, registrar validation, vitals flags, CSV export |
 
 ## System architecture
 

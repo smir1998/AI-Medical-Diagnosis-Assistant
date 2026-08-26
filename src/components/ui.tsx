@@ -1,20 +1,40 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
+/* ---------- prefers-reduced-motion ---------- */
+
+export function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const fn = (e: MediaQueryListEvent) => setReduced(e.matches);
+    mq.addEventListener("change", fn);
+    return () => mq.removeEventListener("change", fn);
+  }, []);
+  return reduced;
+}
+
 /* ---------- scroll reveal ---------- */
 
 export function Reveal({
   children,
-  className = "",
   delay = 0,
+  className = "",
 }: {
   children: ReactNode;
-  className?: string;
   delay?: number;
+  className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [inView, setInView] = useState(false);
+  const reduced = usePrefersReducedMotion();
 
   useEffect(() => {
+    if (reduced) {
+      setInView(true);
+      return;
+    }
     const el = ref.current;
     if (!el) return;
     const io = new IntersectionObserver(
@@ -28,7 +48,7 @@ export function Reveal({
     );
     io.observe(el);
     return () => io.disconnect();
-  }, []);
+  }, [reduced]);
 
   return (
     <div
@@ -41,85 +61,86 @@ export function Reveal({
   );
 }
 
-/* ---------- scramble-decode headline ---------- */
+/* ---------- scramble-decode title ---------- */
 
-const GLYPHS = "▓▒░<>/\\+=*#%@";
+const GLYPHS = "▓▒░#%+X01△▽";
 
 export function Scramble({ text, className = "" }: { text: string; className?: string }) {
-  const [out, setOut] = useState(text);
-  const done = useRef(false);
+  const reduced = usePrefersReducedMotion();
+  const [out, setOut] = useState(reduced ? text : "");
 
   useEffect(() => {
-    if (done.current) return;
-    done.current = true;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (reduced) {
+      setOut(text);
+      return;
+    }
     let frame = 0;
-    const total = 26;
+    const total = Math.max(14, text.length * 3);
     const id = window.setInterval(() => {
       frame++;
-      const locked = Math.floor((frame / total) * text.length);
-      let next = "";
+      const reveal = Math.floor((frame / total) * text.length);
+      let s = "";
       for (let i = 0; i < text.length; i++) {
-        next += i < locked ? text[i] : GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
+        s += i < reveal ? text[i] : GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
       }
-      setOut(next);
+      setOut(s);
       if (frame >= total) {
         setOut(text);
         window.clearInterval(id);
       }
-    }, 42);
+    }, 40);
     return () => window.clearInterval(id);
-  }, [text]);
+  }, [text, reduced]);
 
-  return <span className={className}>{out}</span>;
+  return <span className={className}>{out || "\u00A0"}</span>;
 }
 
-/* ---------- animated count-up ---------- */
+/* ---------- count-up ---------- */
 
 export function CountUp({
   value,
   decimals = 0,
   suffix = "",
+  duration = 1200,
   className = "",
 }: {
   value: number;
   decimals?: number;
   suffix?: string;
+  duration?: number;
   className?: string;
 }) {
-  const [display, setDisplay] = useState(0);
+  const reduced = usePrefersReducedMotion();
   const ref = useRef<HTMLSpanElement>(null);
+  const [display, setDisplay] = useState(reduced ? value : 0);
+  const started = useRef(false);
 
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (reduced) {
       setDisplay(value);
       return;
     }
-    let raf = 0;
+    const el = ref.current;
+    if (!el) return;
     const io = new IntersectionObserver(
       ([entry]) => {
-        if (!entry.isIntersecting) return;
-        io.disconnect();
+        if (!entry.isIntersecting || started.current) return;
+        started.current = true;
         const t0 = performance.now();
-        const dur = 1100;
         const tick = (t: number) => {
-          const p = Math.min(1, (t - t0) / dur);
+          const p = Math.min(1, (t - t0) / duration);
           const eased = 1 - Math.pow(1 - p, 3);
           setDisplay(value * eased);
-          if (p < 1) raf = requestAnimationFrame(tick);
+          if (p < 1) requestAnimationFrame(tick);
         };
-        raf = requestAnimationFrame(tick);
+        requestAnimationFrame(tick);
+        io.disconnect();
       },
-      { threshold: 0.4 }
+      { threshold: 0.3 }
     );
     io.observe(el);
-    return () => {
-      io.disconnect();
-      cancelAnimationFrame(raf);
-    };
-  }, [value]);
+    return () => io.disconnect();
+  }, [value, duration, reduced]);
 
   return (
     <span ref={ref} className={className}>
@@ -131,21 +152,31 @@ export function CountUp({
 
 /* ---------- ECG trace ---------- */
 
+const ECG_PATH =
+  "M0 22 L12 22 L16 22 L20 12 L24 30 L28 22 L40 22 L44 20 L48 24 L52 22 L70 22 L74 22 L78 6 L82 34 L86 22 L100 22";
+
 export function ECGLine({ className = "", slow = false }: { className?: string; slow?: boolean }) {
   return (
-    <svg
-      viewBox="0 0 600 60"
-      preserveAspectRatio="none"
-      className={className}
-      aria-hidden="true"
-    >
+    <svg viewBox="0 0 100 40" preserveAspectRatio="none" className={className} aria-hidden="true">
       <path
-        d="M0 30 H80 L92 30 L100 12 L108 46 L116 30 H190 L202 30 L210 12 L218 46 L226 30 H300 L312 30 L320 12 L328 46 L336 30 H410 L422 30 L430 12 L438 46 L446 30 H520 L532 30 L540 12 L548 46 L556 30 H600"
+        d={ECG_PATH}
         fill="none"
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
         pathLength={100}
         className={`ecg-trace ${slow ? "ecg-slow" : ""}`}
+        opacity="0.9"
+      />
+      <path
+        d={ECG_PATH}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        vectorEffect="non-scaling-stroke"
+        opacity="0.18"
       />
     </svg>
   );
@@ -160,75 +191,76 @@ export function SectionTag({ children, tone = "teal" }: { children: ReactNode; t
     ink: "text-ink border-ink/30",
   };
   return (
-    <p className={`inline-flex items-center gap-2 border px-2.5 py-1 font-mono text-[10px] font-bold tracking-[0.28em] uppercase ${tones[tone]}`}>
-      <span className="blink-soft">▮</span> {children}
-    </p>
+    <span
+      className={`inline-flex items-center gap-2 border px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.24em] ${tones[tone]}`}
+    >
+      <span className="h-1.5 w-1.5 bg-current" />
+      {children}
+    </span>
   );
 }
 
-/* ---------- inline SVG icon set ---------- */
+/* ---------- custom SVG icons ---------- */
 
 export type IconName =
   | "pulse"
-  | "brain"
   | "scan"
   | "stetho"
   | "chat"
-  | "upload"
-  | "doc"
-  | "print"
+  | "brain"
+  | "report"
   | "check"
-  | "warn"
   | "x"
+  | "warn"
   | "arrow"
+  | "upload"
   | "flask"
   | "clock"
   | "layers"
-  | "scope";
+  | "scope"
+  | "user"
+  | "print"
+  | "doc";
 
-export function Icon({ name, className = "" }: { name: IconName; className?: string }) {
+export function Icon({ name, className = "h-4 w-4" }: { name: IconName; className?: string }) {
   const paths: Record<IconName, ReactNode> = {
     pulse: <path d="M2 12h4l3-8 4 16 3-8h6" />,
-    brain: (
-      <path d="M9.5 3a3 3 0 0 0-3 3 3.2 3.2 0 0 0-2.3 3.1c0 .9.4 1.7 1 2.3A3.3 3.3 0 0 0 6.5 17a3 3 0 0 0 3 3.5c.8 0 1.6-.3 2.2-.8h.6c.6.5 1.4.8 2.2.8a3 3 0 0 0 3-3.5 3.3 3.3 0 0 0 1.3-5.6c.6-.6 1-1.4 1-2.3A3.2 3.2 0 0 0 17.5 6a3 3 0 0 0-3-3c-.8 0-1.6.3-2.2.8h-.6C11.1 3.3 10.3 3 9.5 3ZM12 4.5v15" />
-    ),
     scan: (
       <>
-        <path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3" />
-        <path d="M4 12h16" />
+        <path d="M3 7V4a1 1 0 0 1 1-1h3M17 3h3a1 1 0 0 1 1 1v3M21 17v3a1 1 0 0 1-1 1h-3M7 21H4a1 1 0 0 1-1-1v-3" />
+        <path d="M3 12h18" />
       </>
     ),
     stetho: (
-      <path d="M5 3v6a5 5 0 0 0 10 0V3M10 14v3a4 4 0 0 0 8 0v-1.3M18 13.5a2 2 0 1 0 0 .01" />
-    ),
-    chat: <path d="M21 12a8 8 0 0 1-8 8H4l2.3-3A8 8 0 1 1 21 12ZM8.5 10.5h.01M12 10.5h.01M15.5 10.5h.01" />,
-    upload: <path d="M12 16V4m0 0 4 4m-4-4L8 8M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" />,
-    doc: (
       <>
-        <path d="M6 2.5h8l4 4V21.5H6z" />
-        <path d="M14 2.5v4h4M9 12h6M9 15.5h6M9 8.5h2" />
+        <path d="M5 3v5a5 5 0 0 0 10 0V3" />
+        <path d="M10 13v3a4 4 0 0 0 8 0v-2" />
+        <circle cx="18" cy="11" r="2" />
       </>
     ),
-    print: (
+    chat: <path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5zM8 10h8M8 13h5" />,
+    brain: (
       <>
-        <path d="M6 9V3h12v6M6 17H3v-7h18v7h-3" />
-        <path d="M6 14h12v7H6z" />
+        <path d="M9.5 2a3 3 0 0 0-3 3 3.5 3.5 0 0 0-2 6A3.5 3.5 0 0 0 6 17a3 3 0 0 0 6 0V5a3 3 0 0 0-2.5-3z" />
+        <path d="M14.5 2a3 3 0 0 1 3 3 3.5 3.5 0 0 1 2 6A3.5 3.5 0 0 1 18 17a3 3 0 0 1-6 0V5a3 3 0 0 1 2.5-3z" />
       </>
     ),
-    check: <path d="m4.5 12.5 5 5L19.5 6.5" />,
-    warn: (
+    report: (
       <>
-        <path d="M12 3 2.5 20h19L12 3Z" />
-        <path d="M12 9.5V14M12 16.8v.4" />
+        <path d="M6 2h9l4 4v16H6z" />
+        <path d="M15 2v4h4M9 12h7M9 16h7" />
       </>
     ),
-    x: <path d="M5 5l14 14M19 5 5 19" />,
-    arrow: <path d="M4 12h15m0 0-6-6m6 6-6 6" />,
-    flask: <path d="M9.5 3h5M10 3v6.2L4.8 18a2 2 0 0 0 1.8 3h10.8a2 2 0 0 0 1.8-3L14 9.2V3M7.5 14.5h9" />,
+    check: <path d="M4 12.5l5 5L20 6.5" />,
+    x: <path d="M5 5l14 14M19 5L5 19" />,
+    warn: <path d="M12 3L1.5 21h21L12 3zM12 10v5M12 18.2v.3" />,
+    arrow: <path d="M4 12h15M13 6l6 6-6 6" />,
+    upload: <path d="M12 16V4M6 10l6-6 6 6M4 20h16" />,
+    flask: <path d="M9 3h6M10 3v6L4.5 19a1.5 1.5 0 0 0 1.4 2h12.2a1.5 1.5 0 0 0 1.4-2L14 9V3M7.5 15h9" />,
     clock: (
       <>
-        <circle cx="12" cy="12" r="8.5" />
-        <path d="M12 7.5V12l3.5 2" />
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3.5 2" />
       </>
     ),
     layers: <path d="m12 3 9 5-9 5-9-5 9-5zM3 13l9 5 9-5M3 17.5l9 5 9-5" />,
@@ -236,6 +268,25 @@ export function Icon({ name, className = "" }: { name: IconName; className?: str
       <>
         <circle cx="10.5" cy="10.5" r="6.5" />
         <path d="m20.5 20.5-5.4-5.4M8 10.5h5M10.5 8v5" />
+      </>
+    ),
+    user: (
+      <>
+        <circle cx="12" cy="8" r="4" />
+        <path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5" />
+      </>
+    ),
+    print: (
+      <>
+        <path d="M7 8V3h10v5" />
+        <path d="M5 8h14a1 1 0 0 1 1 1v7h-4v5H8v-5H4V9a1 1 0 0 1 1-1z" />
+        <path d="M8 17h8" />
+      </>
+    ),
+    doc: (
+      <>
+        <path d="M6 2h9l4 4v16H6z" />
+        <path d="M15 2v4h4M9 11h7M9 14.5h7M9 18h4" />
       </>
     ),
   };

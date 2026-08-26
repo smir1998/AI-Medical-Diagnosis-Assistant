@@ -104,9 +104,9 @@ export function ModelVitals() {
 export interface HistoryEntry {
   id: number;
   time: string;
-  type: "symptom" | "image" | "derm";
+  type: "symptom" | "image" | "derm" | "adm";
   title: string;
-  confidence: number;
+  confidence: number; // -1 → not applicable (e.g. admissions)
 }
 
 export function HistoryPanel({ entries }: { entries: HistoryEntry[] }) {
@@ -134,22 +134,33 @@ export function HistoryPanel({ entries }: { entries: HistoryEntry[] }) {
                     ? "bg-alert/15 text-alert"
                     : e.type === "derm"
                       ? "bg-amber/25 text-ink"
-                      : "bg-teal/15 text-teal"
+                      : e.type === "adm"
+                        ? "bg-ink/10 text-ink"
+                        : "bg-teal/15 text-teal"
                 }`}
               >
                 <Icon
-                  name={e.type === "image" ? "scan" : e.type === "derm" ? "scope" : "stetho"}
+                  name={
+                    e.type === "image" ? "scan" : e.type === "derm" ? "scope" : e.type === "adm" ? "user" : "stetho"
+                  }
                   className="h-3.5 w-3.5"
                 />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-xs font-semibold">{e.title}</span>
                 <span className="font-mono text-[9px] tracking-wider text-inksoft/70">
-                  {e.time} · {e.type === "image" ? "CNN" : e.type === "derm" ? "CNN-DERM" : "NLP-SYMPTOMS"}
+                  {e.time} ·{" "}
+                  {e.type === "image"
+                    ? "CNN"
+                    : e.type === "derm"
+                      ? "CNN-DERM"
+                      : e.type === "adm"
+                        ? "REGISTRAR"
+                        : "NLP-SYMPTOMS"}
                 </span>
               </span>
               <span className="font-mono text-[11px] font-bold tabular-nums text-teal">
-                {e.confidence.toFixed(1)}%
+                {e.confidence >= 0 ? `${e.confidence.toFixed(1)}%` : "—"}
               </span>
             </li>
           ))}

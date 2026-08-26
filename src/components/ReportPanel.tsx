@@ -1,14 +1,17 @@
 import type { ImageResult, SymptomResult } from "../lib/engine";
 import type { DermResult } from "./DermScan";
+import type { Patient } from "./PatientRegistry";
+import { TRIAGE_META } from "./PatientRegistry";
 import { Icon } from "./ui";
 
 interface Props {
   symptom: SymptomResult | null;
   image: ImageResult | null;
   derm?: DermResult | null;
+  patient?: Patient | null;
 }
 
-export function ReportPanel({ symptom, image, derm }: Props) {
+export function ReportPanel({ symptom, image, derm, patient }: Props) {
   if (!symptom && !image && !derm) return null;
 
   const top = symptom?.scored[0];
@@ -53,6 +56,40 @@ export function ReportPanel({ symptom, image, derm }: Props) {
             <p>ID: {reportId}</p>
             <p>DATE: {today}</p>
           </div>
+        </div>
+
+        {/* patient banner — stamped from the registrar */}
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-1 border-b border-ink/20 bg-paperdeep/60 px-5 py-2.5 font-mono text-[11px]">
+          {patient ? (
+            <>
+              <p>
+                <span className="text-inksoft">PATIENT&nbsp;&nbsp;:</span>{" "}
+                <span className="font-bold text-ink">{patient.name}</span> · {patient.age}y {patient.sex}
+              </p>
+              <p>
+                <span className="text-inksoft">MRN&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</span> {patient.id}
+              </p>
+              <p>
+                <span className="text-inksoft">TRIAGE&nbsp;&nbsp;&nbsp;&nbsp;:</span>{" "}
+                <span className="font-bold">
+                  {patient.triage} · {TRIAGE_META[patient.triage].label}
+                </span>
+              </p>
+              {patient.complaint !== "—" && (
+                <p>
+                  <span className="text-inksoft">CC&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</span>{" "}
+                  {patient.complaint}
+                </p>
+              )}
+              <p>
+                <span className="text-inksoft">ALLERGIES&nbsp;:</span> {patient.allergies}
+              </p>
+            </>
+          ) : (
+            <p className="text-inksoft/70">
+              PATIENT : unregistered study — admit via the Registrar (Step 01) to stamp this report
+            </p>
+          )}
         </div>
 
         <div className="grid gap-0 md:grid-cols-[1.1fr_0.9fr]">

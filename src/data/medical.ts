@@ -255,7 +255,7 @@ export const CHAT_KB: ChatEntry[] = [
   {
     keys: ["how does", "how it works", "work", "architecture", "pipeline"],
     answer:
-      "Three heads: (1) a symptom encoder converts checked symptoms into a weighted feature vector and scores 12 disease profiles with a softmax head; (2) a CNN scores uploaded chest radiographs; (3) a dermoscopy CNN classifies skin lesions against the ABCDE rule. All are deterministic educational simulations of real clinical ML pipelines.",
+      "Four heads: (1) a symptom encoder converts checked symptoms into a weighted feature vector and scores 12 disease profiles with a softmax head; (2) a CNN scores uploaded chest radiographs; (3) a dermoscopy CNN classifies skin lesions against the ABCDE rule. All are deterministic educational simulations of real clinical ML pipelines.",
   },
   {
     keys: ["deploy", "streamlit", "fastapi", "render", "railway", "hugging"],
@@ -397,6 +397,7 @@ export const TICKER_ITEMS = [
   "PneumoNet v3 accuracy 94.2%",
   "24 symptoms indexed",
   "12 disease profiles",
+  "Registrar · on-device admission log",
   "Recall-first triage policy",
   "Grad-CAM attention mapping",
   "ISIC-2019 · 25,331 dermoscopy images",

@@ -8,6 +8,7 @@ import { SymptomChecker } from "./components/SymptomChecker";
 import { ImageAnalysis } from "./components/ImageAnalysis";
 import { DermScan, type DermResult } from "./components/DermScan";
 import { Chatbot } from "./components/Chatbot";
+import { PatientRegistry, type Patient } from "./components/PatientRegistry";
 import { ReportPanel } from "./components/ReportPanel";
 import { HistoryPanel, ModelVitals, PipelinePanel, type HistoryEntry } from "./components/RailPanels";
 import { Evaluation, FieldNotes, InsideModel } from "./components/InfoSections";
@@ -40,6 +41,24 @@ export default function App() {
   });
   const [qaOpen, setQaOpen] = useState(false);
 
+  /* ---------- patient registry (persisted) ---------- */
+  const [patients, setPatients] = useState<Patient[]>(() => {
+    try {
+      const raw = localStorage.getItem("medlens-patients");
+      const parsed = raw ? (JSON.parse(raw) as Patient[]) : [];
+      return Array.isArray(parsed) ? parsed.slice(0, 30) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [activePatientId, setActivePatientId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem("medlens-active-patient");
+    } catch {
+      return null;
+    }
+  });
+
   useEffect(() => {
     try {
       localStorage.setItem("medlens-history", JSON.stringify(history.slice(0, 12)));
@@ -47,6 +66,50 @@ export default function App() {
       /* storage unavailable — session-only log */
     }
   }, [history]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("medlens-patients", JSON.stringify(patients.slice(0, 30)));
+    } catch {
+      /* private mode — registry lives for the session only */
+    }
+  }, [patients]);
+
+  useEffect(() => {
+    try {
+      if (activePatientId) localStorage.setItem("medlens-active-patient", activePatientId);
+      else localStorage.removeItem("medlens-active-patient");
+    } catch {
+      /* ignore */
+    }
+  }, [activePatientId]);
+
+  const activePatient = patients.find((p) => p.id === activePatientId && p.status === "admitted") ?? null;
+
+  const onAdmit = (p: Patient) => {
+    setPatients((prev) => [p, ...prev].slice(0, 30));
+    setActivePatientId(p.id);
+    setHistory((h) => [
+      {
+        id: Date.now(),
+        time: nowTime(),
+        type: "adm" as const,
+        title: `${p.name} · T${p.triage} admitted`,
+        confidence: -1,
+      },
+      ...h,
+    ]);
+  };
+
+  const dischargePatient = (id: string) => {
+    setPatients((prev) => prev.map((p) => (p.id === id ? { ...p, status: "discharged" as const } : p)));
+    setActivePatientId((cur) => (cur === id ? null : cur));
+  };
+
+  const removePatient = (id: string) => {
+    setPatients((prev) => prev.filter((p) => p.id !== id));
+    setActivePatientId((cur) => (cur === id ? null : cur));
+  };
 
   const onPipeline = (stage: number, running: boolean) => setPipeline({ stage, running });
 
@@ -160,6 +223,39 @@ export default function App() {
 
       {/* ---------- console workspace ---------- */}
       <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
+        {/* 01 · registrar */}
+        <section aria-label="Patient intake and admission log" className="mb-14">
+          <Reveal>
+            <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <SectionTag tone="ink">Step 01 · Registrar</SectionTag>
+                <h2 className="mt-3 font-display text-3xl font-black tracking-tight sm:text-4xl">
+                  Patient intake<span className="text-teal">, on the record.</span>
+                </h2>
+              </div>
+              <p className="max-w-sm text-sm leading-relaxed text-inksoft">
+                Admit a patient before running any lab — the active chart is stamped onto every analysis
+                report. Entries are logged and persist in this browser only.
+              </p>
+            </div>
+          </Reveal>
+          <Reveal delay={120}>
+            <PatientRegistry
+              patients={patients}
+              activeId={activePatientId}
+              onAdmit={onAdmit}
+              onActivate={setActivePatientId}
+              onDischarge={dischargePatient}
+              onRemove={removePatient}
+            />
+          </Reveal>
+        </section>
+
+        {/* 02 · diagnostics */}
+        <Reveal className="mb-4">
+          <SectionTag>Step 02 · Diagnostics</SectionTag>
+        </Reveal>
+
         <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
           {/* left: tabbed labs */}
           <div className="min-w-0">
@@ -208,7 +304,12 @@ export default function App() {
             </div>
 
             <div className="mt-8">
-              <ReportPanel symptom={symptomResult} image={imageResult} derm={dermResult} />
+              <Reveal>
+                <SectionTag tone="ink">Step 03 · Report</SectionTag>
+              </Reveal>
+              <div className="mt-3">
+                <ReportPanel symptom={symptomResult} image={imageResult} derm={dermResult} patient={activePatient} />
+              </div>
             </div>
           </div>
 

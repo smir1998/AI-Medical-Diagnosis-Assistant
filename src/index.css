@@ -108,6 +108,12 @@ body {
 }
 .cell-scan { animation: cell-scan 0.7s ease-in-out infinite; }
 
+@keyframes row-flash {
+  from { background-color: rgba(14, 124, 114, 0.32); }
+  to { background-color: transparent; }
+}
+.row-flash { animation: row-flash 1.4s ease-out both; }
+
 @keyframes ecg-draw {
   0% { stroke-dashoffset: 100; }
   70% { stroke-dashoffset: 0; }

@@ -18,6 +18,7 @@ toy-model outputs, not clinical diagnoses. Never use it as a substitute for prof
 
 | Module | Technique | What it does |
 | --- | --- | --- |
+| **Registrar** | On-device admission log (localStorage) | Patient intake form (name, age, sex, chief complaint, allergies, CTAS triage 1–5), auto-issued MRNs, chart/discharge workflow — the active patient is stamped onto every report |
 | **Symptom Lab** | NLP-encoded feature vector → softmax over 12 disease profiles | Differential diagnosis with confidence, ICD-10 codes, severity tiers, red-flag rules |
 | **Radiology Lab** | Simulated CNN (Conv→Pool→Dense→softmax) with Grad-CAM-style hotspot | Pneumonia vs Normal classification on uploaded or sample chest X-rays |
 | **Derm Scan** | CLAHE → Otsu ROI → 3-class EfficientNet-style head + ABCDE rule engine | Benign / atypical / melanoma-pattern screening with pixel-statistics heuristic |

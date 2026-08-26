@@ -2,56 +2,54 @@ import { useEffect, useState } from "react";
 import { PIPELINE_STAGES } from "../data/medical";
 import { Icon } from "./ui";
 
-/* ---------- live system-architecture pipeline ---------- */
+/* ---------- live system architecture ---------- */
 
 export function PipelinePanel({ stage, running }: { stage: number; running: boolean }) {
   return (
-    <div className="dark-grid border border-pine p-4 text-paper">
-      <p className="mb-3 flex items-center gap-2 font-mono text-[10px] font-bold tracking-[0.22em] text-mint/80">
-        <Icon name="layers" className="h-3.5 w-3.5" /> SYSTEM ARCHITECTURE
+    <div className="border border-ink/20 bg-paper p-4">
+      <p className="mb-3 flex items-center gap-2 font-mono text-[10px] font-bold tracking-[0.22em] text-inksoft">
+        <Icon name="layers" className="h-3.5 w-3.5 text-teal" /> SYSTEM ARCHITECTURE
         <span
-          className={`ml-auto inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] tracking-widest ${
-            running ? "bg-alert text-paper" : "bg-mint/15 text-mint"
+          className={`ml-auto font-mono text-[9px] tracking-widest ${
+            running ? "blink-soft text-alert" : "text-teal"
           }`}
         >
-          <span className={`h-1.5 w-1.5 rounded-full ${running ? "blink-soft bg-paper" : "bg-mint"}`} />
-          {running ? "RUNNING" : "IDLE"}
+          {running ? "● LIVE" : "IDLE"}
         </span>
       </p>
-
-      <ol className="space-y-0">
+      <ol className="relative space-y-0.5">
         {PIPELINE_STAGES.map((s, i) => {
-          const done = stage > i || (!running && stage >= 4);
           const active = running && stage === i;
+          const done = stage > i || (!running && stage >= PIPELINE_STAGES.length - 1 && stage === 4);
           return (
-            <li key={s.id} className="relative pl-7 pb-3 last:pb-0">
-              {i < PIPELINE_STAGES.length - 1 && (
+            <li key={s.id} className="relative flex items-stretch gap-3">
+              {/* connector */}
+              <span className="flex flex-col items-center">
                 <span
-                  className={`absolute left-[9px] top-5 h-[calc(100%-14px)] w-px ${
-                    done ? "bg-mint/70" : "bg-mint/20"
+                  className={`grid h-6 w-6 shrink-0 place-items-center border font-mono text-[10px] font-bold transition-all duration-300 ${
+                    active
+                      ? "border-alert bg-alert text-paper shadow-[0_0_0_3px_rgba(199,70,60,0.18)]"
+                      : done
+                        ? "border-teal bg-teal text-paper"
+                        : "border-ink/25 bg-paper text-inksoft"
                   }`}
-                />
-              )}
-              <span
-                className={`absolute left-0 top-0.5 grid h-[19px] w-[19px] place-items-center border font-mono text-[9px] font-bold transition-all duration-300 ${
-                  active
-                    ? "border-mint bg-mint text-pine shadow-[0_0_10px_rgba(143,227,207,0.8)]"
-                    : done
-                      ? "border-mint/70 bg-mint/15 text-mint"
-                      : "border-mint/25 text-mint/40"
-                }`}
-              >
-                {done && !active ? "✓" : i + 1}
+                >
+                  {done && !active ? <Icon name="check" className="h-3 w-3" /> : i + 1}
+                </span>
+                {i < PIPELINE_STAGES.length - 1 && (
+                  <span className={`w-px flex-1 ${done || active ? "bg-teal/50" : "bg-ink/15"}`} />
+                )}
               </span>
-              <p
-                className={`font-mono text-[11px] font-semibold leading-tight transition-colors duration-300 ${
-                  active ? "text-mint" : done ? "text-paper/90" : "text-paper/45"
+              <span
+                className={`pb-3 transition-colors duration-300 ${
+                  active ? "text-ink" : done ? "text-ink/80" : "text-inksoft/70"
                 }`}
               >
-                {s.label}
-                {active && <span className="blink-soft ml-1">▮</span>}
-              </p>
-              <p className="font-mono text-[9px] tracking-wider text-paper/35">{s.detail}</p>
+                <span className="block font-display text-[12px] font-extrabold uppercase tracking-wide leading-6">
+                  {s.label}
+                </span>
+                <span className="block font-mono text-[9px] tracking-wider text-inksoft">{s.detail}</span>
+              </span>
             </li>
           );
         })}
@@ -63,55 +61,40 @@ export function PipelinePanel({ stage, running }: { stage: number; running: bool
 /* ---------- model vitals ---------- */
 
 export function ModelVitals() {
-  const [tick, setTick] = useState(0);
+  const [uptime, setUptime] = useState(0);
+  const [latency, setLatency] = useState(184);
 
   useEffect(() => {
-    const id = window.setInterval(() => setTick((t) => t + 1), 2200);
+    const t0 = Date.now();
+    const id = window.setInterval(() => {
+      setUptime(Math.floor((Date.now() - t0) / 1000));
+      setLatency(160 + Math.floor(Math.random() * 60));
+    }, 1000);
     return () => window.clearInterval(id);
   }, []);
 
-  const latency = 34 + ((tick * 7) % 13);
-  const gpu = 41 + ((tick * 11) % 17);
-  const uptime = 18400 + tick * 2;
-  const fmtUp = `${Math.floor(uptime / 3600)}h ${String(Math.floor((uptime % 3600) / 60)).padStart(2, "0")}m`;
-
-  const rows = [
-    { label: "PneumoNet v3", acc: 94.2 },
-    { label: "DermaScan", acc: 91.5 },
-    { label: "SymptomEncoder", acc: 88.4 },
-  ];
+  const mm = String(Math.floor(uptime / 60)).padStart(2, "0");
+  const ss = String(uptime % 60).padStart(2, "0");
 
   return (
     <div className="border border-ink/20 bg-paper p-4">
       <p className="mb-3 flex items-center gap-2 font-mono text-[10px] font-bold tracking-[0.22em] text-inksoft">
         <Icon name="pulse" className="h-3.5 w-3.5 text-teal" /> MODEL VITALS
-        <span className="ml-auto font-mono text-[9px] text-teal">uptime {fmtUp}</span>
       </p>
-
-      <div className="space-y-2.5">
-        {rows.map((r) => (
-          <div key={r.label}>
-            <div className="flex justify-between font-mono text-[10px]">
-              <span className="font-semibold text-ink">{r.label}</span>
-              <span className="tabular-nums text-teal">{r.acc.toFixed(1)}%</span>
-            </div>
-            <div className="mt-1 h-1.5 bg-ink/10">
-              <div className="bar-fill h-full bg-teal" style={{ width: `${r.acc}%` }} />
-            </div>
+      <dl className="space-y-2 font-mono text-[11px]">
+        {[
+          { k: "Session uptime", v: `${mm}:${ss}` },
+          { k: "Inference latency", v: `${latency} ms` },
+          { k: "Models loaded", v: "4 / 4" },
+          { k: "Data egress", v: "0 bytes" },
+          { k: "Triage policy", v: "RECALL-FIRST" },
+        ].map((row) => (
+          <div key={row.k} className="flex items-baseline justify-between gap-3 border-b border-dashed border-ink/10 pb-1.5">
+            <dt className="text-inksoft">{row.k}</dt>
+            <dd className="font-bold tabular-nums text-ink">{row.v}</dd>
           </div>
         ))}
-      </div>
-
-      <div className="mt-3.5 grid grid-cols-2 gap-2 border-t border-dashed border-ink/15 pt-3 font-mono text-[10px]">
-        <div className="border border-ink/10 bg-paperdeep/60 px-2 py-1.5">
-          <p className="text-[9px] tracking-widest text-inksoft/70">LATENCY</p>
-          <p className="tabular-nums font-bold text-ink">{latency} ms</p>
-        </div>
-        <div className="border border-ink/10 bg-paperdeep/60 px-2 py-1.5">
-          <p className="text-[9px] tracking-widest text-inksoft/70">GPU·SIM MEM</p>
-          <p className="tabular-nums font-bold text-ink">{gpu}%</p>
-        </div>
-      </div>
+      </dl>
     </div>
   );
 }
@@ -121,9 +104,9 @@ export function ModelVitals() {
 export interface HistoryEntry {
   id: number;
   time: string;
-  type: "symptom" | "image" | "derm";
+  type: "symptom" | "image" | "derm" | "adm";
   title: string;
-  confidence: number;
+  confidence: number; // -1 → not applicable (e.g. admissions)
 }
 
 export function HistoryPanel({ entries }: { entries: HistoryEntry[] }) {
@@ -151,22 +134,33 @@ export function HistoryPanel({ entries }: { entries: HistoryEntry[] }) {
                     ? "bg-alert/15 text-alert"
                     : e.type === "derm"
                       ? "bg-amber/25 text-ink"
-                      : "bg-teal/15 text-teal"
+                      : e.type === "adm"
+                        ? "bg-ink/10 text-ink"
+                        : "bg-teal/15 text-teal"
                 }`}
               >
                 <Icon
-                  name={e.type === "image" ? "scan" : e.type === "derm" ? "scope" : "stetho"}
+                  name={
+                    e.type === "image" ? "scan" : e.type === "derm" ? "scope" : e.type === "adm" ? "user" : "stetho"
+                  }
                   className="h-3.5 w-3.5"
                 />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-xs font-semibold">{e.title}</span>
                 <span className="font-mono text-[9px] tracking-wider text-inksoft/70">
-                  {e.time} · {e.type === "image" ? "CNN" : e.type === "derm" ? "CNN-DERM" : "NLP-SYMPTOMS"}
+                  {e.time} ·{" "}
+                  {e.type === "image"
+                    ? "CNN"
+                    : e.type === "derm"
+                      ? "CNN-DERM"
+                      : e.type === "adm"
+                        ? "REGISTRAR"
+                        : "NLP-SYMPTOMS"}
                 </span>
               </span>
               <span className="font-mono text-[11px] font-bold tabular-nums text-teal">
-                {e.confidence.toFixed(1)}%
+                {e.confidence >= 0 ? `${e.confidence.toFixed(1)}%` : "—"}
               </span>
             </li>
           ))}

@@ -46,12 +46,9 @@ export function Chatbot() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, typing]);
 
-  useEffect(
-    () => () => {
-      if (timer.current) window.clearTimeout(timer.current);
-    },
-    []
-  );
+  useEffect(() => () => {
+    if (timer.current) window.clearTimeout(timer.current);
+  }, []);
 
   const send = (text: string) => {
     const trimmed = text.trim();
@@ -124,26 +121,23 @@ export function Chatbot() {
           e.preventDefault();
           send(input);
         }}
-        className="mt-2.5 flex gap-2"
+        className="mt-3 flex gap-2"
       >
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask about CNNs, normalization, metrics, triage…"
-          className="min-w-0 flex-1 border border-ink/25 bg-paper px-3.5 py-2.5 font-mono text-xs text-ink outline-none transition-colors placeholder:text-inksoft/50 focus:border-teal"
-          aria-label="Ask the medical chatbot"
+          placeholder="Ask about CNNs, transfer learning, metrics, triage…"
+          aria-label="Ask the medical NLP desk"
+          className="min-w-0 flex-1 border-2 border-ink/25 bg-paper px-3.5 py-2.5 text-sm outline-none transition-colors placeholder:text-inksoft/50 focus:border-teal"
         />
         <button
           type="submit"
-          disabled={typing || !input.trim()}
-          className="inline-flex items-center gap-1.5 border-2 border-ink bg-teal px-4 py-2.5 font-display text-xs font-extrabold uppercase tracking-wider text-paper transition-all duration-200 hover:-translate-y-px disabled:opacity-40 disabled:hover:translate-y-0"
+          disabled={!input.trim() || typing}
+          className="inline-flex items-center gap-1.5 bg-pine px-4 py-2.5 font-display text-xs font-extrabold uppercase tracking-wider text-paper transition-all duration-200 hover:bg-teal disabled:opacity-40"
         >
           <Icon name="arrow" className="h-3.5 w-3.5" /> Send
         </button>
       </form>
-      <p className="mt-2 font-mono text-[9px] tracking-wider text-inksoft/70">
-        KEYWORD-MATCHED KNOWLEDGE BASE · EDUCATIONAL · NOT MEDICAL ADVICE
-      </p>
     </div>
   );
 }

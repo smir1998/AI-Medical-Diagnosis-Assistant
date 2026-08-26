@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { nowTime } from "../lib/engine";
-import { CountUp, Icon } from "./ui";
+import { Icon } from "./ui";
 
 export interface DermFlag {
   key: string;
@@ -328,85 +328,47 @@ export function DermScan({ onDone, onPipeline }: Props) {
                       loading="lazy"
                       className="h-14 w-14 shrink-0 border border-ink/20 object-cover"
                     />
-                    <span>
+                    <span className="min-w-0">
                       <span className="block font-display text-[13px] font-extrabold">{s.label}</span>
-                      <span className="mt-0.5 block font-mono text-[9px] tracking-wider text-inksoft">
-                        {s.tag}
+                      <span className="block truncate font-mono text-[9px] tracking-wider text-inksoft">
+                        {s.name}
                       </span>
+                      <span className="mt-1 block font-mono text-[9px] font-semibold text-teal">{s.tag}</span>
                     </span>
                   </button>
                 ))}
               </div>
             </>
           ) : (
-            <>
-              <div className="dark-grid relative overflow-hidden border-2 border-pine">
-                {["top-2 left-2 border-t-2 border-l-2", "top-2 right-2 border-t-2 border-r-2", "bottom-2 left-2 border-b-2 border-l-2", "bottom-2 right-2 border-b-2 border-r-2"].map(
-                  (c) => (
-                    <span key={c} className={`absolute z-10 h-5 w-5 border-mint/70 ${c}`} />
-                  )
-                )}
-                <img
-                  src={src.url}
-                  alt={src.name}
-                  className="mx-auto max-h-[320px] w-auto max-w-full object-contain p-3"
-                  draggable={false}
-                />
-                {running && (
-                  <>
-                    <span className="scanline" />
-                    <svg
-                      className="reticle pointer-events-none absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 text-mint/70"
-                      viewBox="0 0 100 100"
-                      fill="none"
-                    >
-                      <circle cx="50" cy="50" r="46" stroke="currentColor" strokeWidth="1" strokeDasharray="6 5" />
-                      <path d="M50 0v14M50 86v14M0 50h14M86 50h14" stroke="currentColor" strokeWidth="1" />
-                    </svg>
-                  </>
-                )}
-                <p className="border-t border-mint/15 px-3 py-2 text-center font-mono text-[10px] tracking-[0.18em] text-mint/60">
-                  {src.name.toUpperCase()}
-                </p>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  onClick={analyze}
-                  disabled={running}
-                  className={`inline-flex items-center gap-2 px-5 py-2.5 font-display text-xs font-extrabold uppercase tracking-wider transition-all duration-200 ${
-                    running
-                      ? "cursor-not-allowed border border-ink/20 bg-paperdeep text-ink/40"
-                      : "bg-alert text-paper shadow-[4px_4px_0_0_rgba(11,47,45,1)] hover:-translate-y-0.5"
-                  }`}
-                >
-                  {running ? (
-                    <>
-                      <Icon name="layers" className="h-3.5 w-3.5 spin-slow" /> Scanning…
-                    </>
-                  ) : (
-                    <>
-                      <Icon name="scope" className="h-3.5 w-3.5" /> Run dermoscopy CNN
-                    </>
-                  )}
-                </button>
+            <div className="dark-grid relative overflow-hidden border-2 border-pine">
+              <img src={src.url} alt={src.name} className="mx-auto max-h-[380px] w-auto object-contain" draggable={false} />
+              {running && <span className="scanline" />}
+              {running && (
+                <svg viewBox="0 0 100 100" className="reticle pointer-events-none absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 text-mint">
+                  <circle cx="50" cy="50" r="44" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="8 10" opacity="0.85" />
+                  <path d="M50 2v12M50 86v12M2 50h12M86 50h12" stroke="currentColor" strokeWidth="1.5" />
+                </svg>
+              )}
+              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-pine/85 px-3 py-2 font-mono text-[10px] tracking-wider text-mint">
+                <span className="truncate">{src.name}</span>
                 <button
                   onClick={() => {
                     if (running) return;
                     setSrc(null);
                     setResult(null);
                     setLogIdx(-1);
+                    probsRef.current = null;
                   }}
-                  disabled={running}
-                  className="inline-flex items-center gap-2 border border-ink/25 px-4 py-2.5 font-mono text-xs font-semibold text-inksoft transition-all duration-200 hover:border-ink hover:text-ink disabled:opacity-50"
+                  className="shrink-0 border border-mint/40 px-2 py-0.5 uppercase transition-colors hover:bg-mint hover:text-pine"
                 >
-                  <Icon name="x" className="h-3.5 w-3.5" /> Change photo
+                  replace
                 </button>
               </div>
-            </>
+            </div>
           )}
         </div>
 
-        {/* ---------- pipeline + results ---------- */}
+        {/* ---------- pipeline + output ---------- */}
         <div className="flex flex-col gap-4">
           <div className="dark-grid min-h-[150px] border border-pine px-4 py-3 font-mono text-[11px] leading-relaxed text-mint">
             {logIdx === -1 && !running && <span className="text-mint/40">// preprocessing trace …</span>}
@@ -417,85 +379,96 @@ export function DermScan({ onDone, onPipeline }: Props) {
             ))}
           </div>
 
-          {!result && !running && (
-            <div className="border border-dashed border-ink/25 bg-paperdeep/40 p-4">
-              <p className="font-mono text-[10px] font-bold tracking-[0.22em] text-inksoft">
-                ── ABCDE RULE (WHAT THE MODEL CHECKS)
-              </p>
-              <ul className="mt-2.5 space-y-1.5 text-[13px] leading-relaxed text-inksoft">
-                <li><strong className="text-ink">A</strong>symmetry — one half unlike the other</li>
-                <li><strong className="text-ink">B</strong>order — irregular, notched or blurred edge</li>
-                <li><strong className="text-ink">C</strong>olor — mixed shades of brown / black / red</li>
-                <li><strong className="text-ink">D</strong>iameter — larger than 6 mm</li>
-                <li><strong className="text-ink">E</strong>volving — changing over weeks to months</li>
-              </ul>
-            </div>
-          )}
+          <button
+            onClick={analyze}
+            disabled={running || !src}
+            className={`inline-flex items-center justify-center gap-2 px-5 py-3 font-display text-sm font-extrabold uppercase tracking-wider transition-all duration-200 ${
+              running || !src
+                ? "cursor-not-allowed border border-ink/20 bg-paperdeep text-ink/40"
+                : "bg-alert text-paper shadow-[5px_5px_0_0_rgba(11,47,45,1)] hover:-translate-y-0.5 hover:shadow-[7px_7px_0_0_rgba(11,47,45,1)] active:translate-y-0"
+            }`}
+          >
+            {running ? (
+              <>
+                <Icon name="scope" className="h-4 w-4 spin-slow" /> Scanning lesion…
+              </>
+            ) : (
+              <>
+                <Icon name="scope" className="h-4 w-4" /> Run dermoscopy screen
+              </>
+            )}
+          </button>
 
-          {result && rec && (
+          {result && rec && !running && (
             <div className="space-y-4">
+              {/* 3-class profile */}
               <div className="border border-ink/20 bg-paperdeep/40 p-4">
                 <p className="mb-3 font-mono text-[10px] font-bold tracking-[0.22em] text-inksoft">
-                  3-CLASS RISK PROFILE · {result.time}
+                  RISK PROFILE · {result.time}
                 </p>
                 {[
                   { label: "Benign pattern", v: result.benign, cls: "bg-teal", txt: "text-teal" },
                   { label: "Atypical nevus", v: result.atypical, cls: "bg-amber", txt: "text-amber" },
                   { label: "Melanoma pattern", v: result.melanoma, cls: "bg-alert", txt: "text-alert" },
-                ].map((row, i) => (
+                ].map((row) => (
                   <div key={row.label} className="mb-2.5 last:mb-0">
                     <div className="mb-1 flex items-baseline justify-between">
                       <span className="font-mono text-[11px] font-semibold">{row.label}</span>
-                      <CountUp
-                        value={row.v}
-                        decimals={1}
-                        suffix="%"
-                        className={`font-mono text-sm font-bold tabular-nums ${row.txt}`}
-                      />
+                      <span className={`font-mono text-sm font-bold tabular-nums ${row.txt}`}>{row.v.toFixed(1)}%</span>
                     </div>
                     <div className="h-2 bg-ink/10">
-                      <div
-                        className={`bar-fill h-full ${row.cls}`}
-                        style={{ width: `${row.v}%`, animationDelay: `${i * 130}ms` }}
-                      />
+                      <div className={`bar-fill h-full ${row.cls}`} style={{ width: `${row.v}%` }} />
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className="grid grid-cols-5 gap-1.5">
-                {result.flags.map((f) => (
-                  <div
-                    key={f.key}
-                    title={`${f.label}: ${f.note}`}
-                    className={`border p-2 text-center transition-all duration-200 hover:-translate-y-0.5 ${
-                      f.status === "warn" ? "border-alert/60 bg-alert/10" : "border-teal/40 bg-teal/5"
-                    }`}
-                  >
-                    <span
-                      className={`block font-display text-lg font-black ${
-                        f.status === "warn" ? "text-alert" : "text-teal"
+              {/* ABCDE */}
+              <div className="border border-ink/20 bg-paper p-4">
+                <p className="mb-2.5 font-mono text-[10px] font-bold tracking-[0.22em] text-inksoft">
+                  ABCDE RULE ENGINE
+                </p>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {result.flags.map((f) => (
+                    <div
+                      key={f.key}
+                      title={`${f.label}: ${f.note}`}
+                      className={`grid place-items-center border-2 py-2 font-display text-lg font-black transition-all duration-200 hover:-translate-y-0.5 ${
+                        f.status === "warn"
+                          ? "border-alert bg-alert/15 text-alert"
+                          : "border-teal/40 bg-teal/5 text-teal"
                       }`}
                     >
                       {f.key}
-                    </span>
-                    <span className="mt-0.5 block font-mono text-[8px] tracking-widest text-inksoft uppercase">
-                      {f.status === "warn" ? "flag" : "clear"}
-                    </span>
-                  </div>
-                ))}
+                    </div>
+                  ))}
+                </div>
+                <ul className="mt-2.5 space-y-1">
+                  {result.flags
+                    .filter((f) => f.status === "warn")
+                    .map((f) => (
+                      <li key={f.key} className="flex items-start gap-1.5 font-mono text-[10px] text-alertdeep">
+                        <Icon name="warn" className="mt-0.5 h-3 w-3 shrink-0 text-alert" />
+                        {f.key} · {f.label}: {f.note}
+                      </li>
+                    ))}
+                  {result.flags.every((f) => f.status === "ok") && (
+                    <li className="flex items-center gap-1.5 font-mono text-[10px] text-teal">
+                      <Icon name="check" className="h-3 w-3" /> All criteria within benign range
+                    </li>
+                  )}
+                </ul>
               </div>
 
+              {/* recommendation */}
               <div className={`border-2 p-4 ${toneStyles[rec.tone]}`}>
-                <p className="flex items-center gap-2 font-display text-xs font-extrabold uppercase tracking-wider">
+                <p className="flex items-center gap-2 font-display text-sm font-extrabold uppercase tracking-wide">
                   <Icon name={rec.tone === "ok" ? "check" : "warn"} className="h-4 w-4" />
                   {rec.title}
                 </p>
-                <ul className="mt-2 space-y-1 pl-4 text-[13px] leading-relaxed">
+                <ul className="mt-2 space-y-1 pl-5 text-[13px]">
                   {rec.lines.map((l) => (
-                    <li key={l} className="list-disc">
-                      {l}
-                    </li>
+                    <li key={l} className="list-disc">{l}</li>
                   ))}
                 </ul>
               </div>

@@ -102,6 +102,18 @@ body {
 }
 .hotspot { animation: hotspot-pulse 2.4s ease-in-out infinite; }
 
+@keyframes cell-scan {
+  0%, 100% { background-color: rgba(14, 124, 114, 0.95); box-shadow: 0 0 8px rgba(143, 227, 207, 0.8); }
+  50% { background-color: rgba(143, 227, 207, 0.55); }
+}
+.cell-scan { animation: cell-scan 0.7s ease-in-out infinite; }
+
+@keyframes row-flash {
+  from { background-color: rgba(14, 124, 114, 0.32); }
+  to { background-color: transparent; }
+}
+.row-flash { animation: row-flash 1.4s ease-out both; }
+
 @keyframes ecg-draw {
   0% { stroke-dashoffset: 100; }
   70% { stroke-dashoffset: 0; }
@@ -163,19 +175,8 @@ body {
 .report-card {
   break-inside: avoid;
 }
-@page {
-  margin: 12mm;
-}
 @media print {
-  .no-print,
-  .noise-overlay {
-    display: none !important;
-  }
-  body {
-    background: #fff !important;
-    background-image: none !important;
-  }
-  /* isolate the report: hide everything else on the page */
+  /* isolate the patient report: hide everything else */
   body * {
     visibility: hidden !important;
   }
@@ -185,12 +186,23 @@ body {
   }
   .report-card {
     position: absolute !important;
-    left: 0;
-    top: 0;
-    width: 100%;
-    margin: 0;
-    border-width: 1px !important;
+    inset: 0 auto auto 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    border: 2px solid #16241f !important;
     box-shadow: none !important;
+    transform: none !important;
+  }
+  .no-print,
+  .noise-overlay {
+    display: none !important;
+  }
+  body {
+    background: #fff !important;
+    background-image: none !important;
+  }
+  @page {
+    margin: 14mm;
   }
 }
 

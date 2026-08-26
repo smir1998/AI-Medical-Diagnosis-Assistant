@@ -397,6 +397,7 @@ export const TICKER_ITEMS = [
   "PneumoNet v3 accuracy 94.2%",
   "24 symptoms indexed",
   "12 disease profiles",
+  "Registrar · on-device admission log",
   "Recall-first triage policy",
   "Grad-CAM attention mapping",
   "ISIC-2019 · 25,331 dermoscopy images",

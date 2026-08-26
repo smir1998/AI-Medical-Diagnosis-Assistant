@@ -14,17 +14,41 @@ const RUN_SCRIPT = [
   { stage: 4, line: "✓ inference complete — compiling report" },
 ];
 
+const PRESETS: { label: string; note: string; ids: string[]; durationIdx: number; severity: number }[] = [
+  {
+    label: "Flu-like",
+    note: "classic viral",
+    ids: ["fever", "cough", "muscle_aches", "fatigue", "chills"],
+    durationIdx: 1,
+    severity: 6,
+  },
+  {
+    label: "Cardiac alarm",
+    note: "red-flag demo",
+    ids: ["chest_pain", "shortness_breath", "fatigue"],
+    durationIdx: 0,
+    severity: 9,
+  },
+  {
+    label: "GI bug",
+    note: "dehydration watch",
+    ids: ["diarrhea", "vomiting", "nausea", "abdominal_pain"],
+    durationIdx: 1,
+    severity: 5,
+  },
+  {
+    label: "Neuro",
+    note: "headache workup",
+    ids: ["headache", "nausea", "dizziness"],
+    durationIdx: 2,
+    severity: 6,
+  },
+];
+
 interface Props {
   onComplete: (r: SymptomResult) => void;
   onPipeline: (stage: number, running: boolean) => void;
 }
-
-const PRESETS: { label: string; ids: string[]; dur: number; sev: number }[] = [
-  { label: "FLU-LIKE", ids: ["fever", "cough", "muscle_aches", "fatigue", "chills"], dur: 1, sev: 6 },
-  { label: "CARDIAC ALARM", ids: ["chest_pain", "shortness_breath", "dizziness"], dur: 0, sev: 9 },
-  { label: "GI BUG", ids: ["diarrhea", "vomiting", "nausea", "abdominal_pain"], dur: 1, sev: 5 },
-  { label: "NEURO", ids: ["headache", "nausea", "dizziness"], dur: 3, sev: 4 },
-];
 
 export function SymptomChecker({ onComplete, onPipeline }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set(["fever", "cough", "fatigue"]));
@@ -50,6 +74,14 @@ export function SymptomChecker({ onComplete, onPipeline }: Props) {
       else next.add(id);
       return next;
     });
+    setResult(null);
+  };
+
+  const applyPreset = (p: (typeof PRESETS)[number]) => {
+    if (running) return;
+    setSelected(new Set(p.ids));
+    setDurationIdx(p.durationIdx);
+    setSeverity(p.severity);
     setResult(null);
   };
 
@@ -81,58 +113,35 @@ export function SymptomChecker({ onComplete, onPipeline }: Props) {
   return (
     <div className="space-y-6">
       {/* scenario presets */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="mr-1 font-mono text-[9px] font-bold tracking-[0.22em] text-inksoft">
-          SCENARIOS:
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-mono text-[10px] font-bold tracking-[0.22em] text-inksoft uppercase">
+          Scenario presets
         </span>
         {PRESETS.map((p) => (
           <button
             key={p.label}
+            onClick={() => applyPreset(p)}
             disabled={running}
-            onClick={() => {
-              setSelected(new Set(p.ids));
-              setDurationIdx(p.dur);
-              setSeverity(p.sev);
-              setResult(null);
-            }}
-            className="border border-ink/25 bg-paperdeep/60 px-2.5 py-1 font-mono text-[10px] font-semibold tracking-wider text-inksoft transition-all duration-200 hover:-translate-y-px hover:border-alert hover:text-alert disabled:opacity-50"
+            title={`${p.ids.length} symptoms · ${p.note}`}
+            className="group border border-ink/25 bg-paperdeep/50 px-3 py-1.5 text-left transition-all duration-200 hover:-translate-y-px hover:border-teal hover:bg-teal/10 disabled:opacity-50"
           >
-            {p.label}
+            <span className="block font-display text-[12px] font-extrabold uppercase tracking-wide leading-none">
+              {p.label}
+            </span>
+            <span className="mt-0.5 block font-mono text-[9px] text-inksoft">{p.note}</span>
           </button>
         ))}
         <button
-          disabled={running || selected.size === 0}
           onClick={() => {
+            if (running) return;
             setSelected(new Set());
             setResult(null);
           }}
-          className="ml-auto border border-dashed border-ink/30 px-2.5 py-1 font-mono text-[10px] tracking-wider text-inksoft transition-all duration-200 hover:border-alert hover:text-alert disabled:opacity-40"
+          disabled={running}
+          className="border border-ink/25 px-3 py-1.5 font-mono text-[10px] font-semibold tracking-widest text-inksoft uppercase transition-all duration-200 hover:border-alert hover:text-alert disabled:opacity-50"
         >
-          CLEAR ALL
+          Clear all
         </button>
-      </div>
-
-      {/* live one-hot vector */}
-      <div className="dark-grid border border-pine p-3">
-        <p className="mb-2 flex items-center justify-between font-mono text-[9px] font-bold tracking-[0.22em] text-mint/60">
-          <span>SYMPTOM VECTOR · 24-DIM ONE-HOT · {selected.size} ACTIVE</span>
-          <span className={running ? "blink-soft text-mint" : ""}>{running ? "ENCODING…" : "IDLE"}</span>
-        </p>
-        <div className="flex gap-[3px]">
-          {SYMPTOMS.map((s, i) => {
-            const on = selected.has(s.id);
-            return (
-              <span
-                key={s.id}
-                title={`${s.label} = ${on ? 1 : 0}`}
-                className={`h-5 flex-1 transition-all duration-300 ${
-                  on ? "bg-mint shadow-[0_0_9px_rgba(143,227,207,0.75)]" : "bg-paper/10 hover:bg-paper/25"
-                } ${running ? "blink-soft" : ""}`}
-                style={{ transitionDelay: `${i * 14}ms`, animationDelay: `${i * 55}ms` }}
-              />
-            );
-          })}
-        </div>
       </div>
 
       {/* intake form */}
@@ -182,6 +191,41 @@ export function SymptomChecker({ onComplete, onPipeline }: Props) {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* one-hot encoding readout */}
+      <div className="border border-ink/15 bg-paperdeep/40 p-3">
+        <p className="mb-2 flex items-center justify-between font-mono text-[10px] font-bold tracking-[0.22em] text-inksoft uppercase">
+          <span className="flex items-center gap-1.5">
+            <Icon name="layers" className="h-3.5 w-3.5 text-teal" /> Input tensor · one-hot
+          </span>
+          <span className="tabular-nums text-teal">
+            Σ = {selected.size} / {SYMPTOMS.length}
+          </span>
+        </p>
+        <div className="flex flex-wrap gap-[3px]" aria-hidden="true">
+          {SYMPTOMS.map((s, i) => {
+            const on = selected.has(s.id);
+            return (
+              <span
+                key={s.id}
+                title={`${s.label} = ${on ? 1 : 0}`}
+                style={{ transitionDelay: `${i * 18}ms` }}
+                className={`h-4 w-3 transition-all duration-300 ${
+                  on
+                    ? running
+                      ? "cell-scan"
+                      : "bg-teal shadow-[0_0_6px_rgba(14,124,114,0.5)]"
+                    : "bg-ink/15"
+                }`}
+              />
+            );
+          })}
+        </div>
+        <p className="mt-2 font-mono text-[9px] tracking-wider text-inksoft/70">
+          [ {SYMPTOMS.map((s) => (selected.has(s.id) ? 1 : 0)).join(" ")} ] — the exact 24-dim vector the
+          encoder receives
+        </p>
       </div>
 
       {/* duration + severity */}

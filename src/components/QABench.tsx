@@ -1,159 +1,143 @@
 import { useEffect, useState } from "react";
-import { runSuite } from "../lib/tests";
-import type { CaseResult } from "../lib/tests";
-import { Icon } from "./ui";
+import { TEST_CASES, runSuite, type CaseResult } from "../lib/tests";
+import { ECGLine, Icon } from "./ui";
 
-interface Props {
-  onClose: () => void;
-}
+export function QABench({ onClose }: { onClose: () => void }) {
+  const [results, setResults] = useState<(CaseResult | null)[]>(() => TEST_CASES.map(() => null));
+  const [phase, setPhase] = useState<"running" | "done">("running");
+  const [elapsed, setElapsed] = useState(0);
 
-export function QABench({ onClose }: Props) {
-  const [results, setResults] = useState<CaseResult[]>([]);
-  const [running, setRunning] = useState(false);
-  const [elapsed, setElapsed] = useState<number | null>(null);
-
-  const start = async () => {
-    if (running) return;
-    setRunning(true);
-    setResults([]);
-    setElapsed(null);
+  useEffect(() => {
+    let cancelled = false;
     const t0 = performance.now();
-    await runSuite((r) => setResults((prev) => [...prev, r]));
-    setElapsed(performance.now() - t0);
-    setRunning(false);
-  };
-
-  useEffect(() => {
-    start();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
+    setResults(TEST_CASES.map(() => null));
+    setPhase("running");
+    setElapsed(0);
+    runSuite((r, i) => {
+      if (cancelled) return;
+      setResults((prev) => {
+        const next = [...prev];
+        next[i] = r;
+        return next;
+      });
+      setElapsed((performance.now() - t0) / 1000);
+    }).then(() => {
+      if (!cancelled) setPhase("done");
+    });
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("keydown", onKey);
+    };
   }, [onClose]);
 
-  const passed = results.filter((r) => r.pass).length;
-  const done = results.length;
-  const total = 20;
-  const allDone = !running && done > 0;
-  const allPass = allDone && passed === done;
+  const passed = results.filter((r) => r?.pass).length;
+  const failed = results.filter((r) => r && !r.pass).length;
+  const pct = Math.round((results.filter(Boolean).length / TEST_CASES.length) * 100);
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-pine/80 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-pine/85 p-4 backdrop-blur-[2px]"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label="QA bench"
+      aria-label="QA regression bench"
     >
       <div
-        className="flex max-h-[88vh] w-full max-w-3xl flex-col border-2 border-ink bg-paper shadow-[10px_10px_0_0_rgba(11,47,45,0.95)]"
+        className="relative max-h-[88vh] w-full max-w-2xl overflow-hidden border-2 border-mint/40 bg-paper shadow-[10px_10px_0_0_rgba(7,33,30,0.9)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* header */}
-        <div className="flex items-center justify-between gap-4 border-b-2 border-ink bg-pine px-5 py-3.5 text-paper">
-          <p className="flex items-center gap-2.5 font-display text-sm font-extrabold uppercase tracking-wide">
-            <span className="grid h-7 w-7 place-items-center bg-mint text-pine">
-              <Icon name="check" className="h-4 w-4" />
-            </span>
-            QA Bench <span className="font-mono text-[10px] font-normal tracking-[0.24em] text-mint/70">REGRESSION SUITE · IN-BROWSER</span>
-          </p>
+        <div className="dark-grid flex items-center justify-between border-b-2 border-pine px-5 py-3.5 text-paper">
+          <div>
+            <p className="flex items-center gap-2 font-display text-sm font-extrabold uppercase tracking-wide">
+              <Icon name="flask" className="h-4 w-4 text-mint" /> QA Bench · regression suite
+            </p>
+            <p className="mt-0.5 font-mono text-[9px] tracking-[0.24em] text-mint/60">
+              {TEST_CASES.length} CASES · LIVE ENGINE · IN-BROWSER
+            </p>
+          </div>
           <button
             onClick={onClose}
             aria-label="Close QA bench"
-            className="grid h-8 w-8 place-items-center border border-paper/30 text-paper/70 transition-all hover:border-alert hover:bg-alert hover:text-paper"
+            className="grid h-8 w-8 place-items-center border border-mint/40 text-mint transition-all duration-200 hover:bg-mint hover:text-pine"
           >
             <Icon name="x" className="h-4 w-4" />
           </button>
         </div>
 
-        {/* summary strip */}
-        <div className="grid grid-cols-4 divide-x divide-ink/10 border-b border-ink/15 bg-paperdeep/60 font-mono text-[11px]">
-          <div className="px-4 py-2.5">
-            <p className="text-[9px] tracking-[0.2em] text-inksoft/70">PASSED</p>
-            <p className="font-bold tabular-nums text-teal">{passed}</p>
+        {/* progress strip */}
+        <div className="border-b border-ink/15 bg-paperdeep/60 px-5 py-2.5">
+          <div className="flex items-center justify-between font-mono text-[10px] tracking-widest text-inksoft">
+            <span>
+              <span className="font-bold text-teal">{passed} PASS</span>
+              {failed > 0 && <span className="ml-2 font-bold text-alert">{failed} FAIL</span>}
+            </span>
+            <span className="tabular-nums">{elapsed.toFixed(1)}s</span>
           </div>
-          <div className="px-4 py-2.5">
-            <p className="text-[9px] tracking-[0.2em] text-inksoft/70">FAILED</p>
-            <p className={`font-bold tabular-nums ${done - passed > 0 ? "text-alert" : "text-ink"}`}>{done - passed}</p>
-          </div>
-          <div className="px-4 py-2.5">
-            <p className="text-[9px] tracking-[0.2em] text-inksoft/70">RUN</p>
-            <p className="font-bold tabular-nums text-ink">
-              {done}/{total}
-            </p>
-          </div>
-          <div className="px-4 py-2.5">
-            <p className="text-[9px] tracking-[0.2em] text-inksoft/70">ELAPSED</p>
-            <p className="font-bold tabular-nums text-ink">{elapsed ? `${(elapsed / 1000).toFixed(2)}s` : running ? "…" : "—"}</p>
-          </div>
-        </div>
-
-        {/* progress */}
-        <div className="h-1.5 bg-ink/10">
-          <div
-            className={`bar-fill h-full ${allPass ? "bg-teal" : allDone ? "bg-alert" : "bg-amber"}`}
-            style={{ width: `${(done / total) * 100}%` }}
-          />
-        </div>
-
-        {/* case list */}
-        <div className="log-scroll flex-1 space-y-1.5 overflow-y-auto p-4">
-          {results.length === 0 && running && (
-            <p className="py-6 text-center font-mono text-xs text-inksoft/60">
-              <span className="blink-soft">▮</span> executing battery against live engine …
-            </p>
-          )}
-          {results.map((r) => (
+          <div className="mt-1.5 h-1.5 bg-ink/10">
             <div
-              key={r.id}
-              className={`flex items-start gap-3 border px-3 py-2 transition-colors ${
-                r.pass ? "border-ink/12 bg-paper" : "border-alert/50 bg-alert/8"
-              }`}
-            >
-              <span
-                className={`mt-0.5 grid h-6 w-10 shrink-0 place-items-center font-mono text-[10px] font-bold tracking-widest ${
-                  r.pass ? "bg-teal text-paper" : "bg-alert text-paper"
+              className={`h-full transition-all duration-300 ${failed > 0 ? "bg-alert" : "bg-teal"}`}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+        </div>
+
+        {/* case rows */}
+        <div className="log-scroll max-h-[52vh] overflow-y-auto px-5 py-3">
+          {results.map((r, i) => {
+            const t = TEST_CASES[i];
+            return (
+              <div
+                key={t.id}
+                className={`flex items-start gap-3 border-b border-dashed border-ink/10 py-2 transition-opacity duration-300 ${
+                  r ? "opacity-100" : "opacity-30"
                 }`}
               >
-                {r.pass ? "PASS" : "FAIL"}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[12.5px] font-semibold leading-snug text-ink">
-                  <span className="mr-1.5 font-mono text-[10px] font-bold text-inksoft/60">{r.id}</span>
-                  {r.name}
-                </p>
-                <p className="mt-0.5 truncate font-mono text-[10.5px] tracking-wide text-inksoft/80">
-                  <span className="mr-2 border border-ink/15 px-1 py-px text-[8.5px] tracking-[0.18em]">{r.suite}</span>
-                  {r.detail}
-                </p>
+                <span className="mt-0.5 w-8 shrink-0 font-mono text-[10px] font-bold text-inksoft">{t.id}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-semibold leading-snug text-ink">{t.name}</span>
+                  <span className="block font-mono text-[9px] tracking-wider text-inksoft/70">
+                    {t.suite}
+                    {r && <span className="ml-2 text-teal/80">{r.detail}</span>}
+                  </span>
+                </span>
+                {r ? (
+                  <span
+                    className={`mt-0.5 shrink-0 border px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-widest ${
+                      r.pass ? "border-teal/50 bg-teal/10 text-teal" : "border-alert/50 bg-alert/10 text-alert"
+                    }`}
+                  >
+                    {r.pass ? "PASS" : "FAIL"}
+                  </span>
+                ) : (
+                  <span className="blink-soft mt-0.5 shrink-0 font-mono text-[9px] font-bold tracking-widest text-inksoft/50">
+                    …
+                  </span>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* footer */}
-        <div className="flex items-center justify-between gap-3 border-t-2 border-ink bg-paperdeep/70 px-5 py-3">
-          <p className="font-mono text-[10px] tracking-wider text-inksoft/80">
-            {running ? (
-              <span className="blink-soft text-amber">RUNNING …</span>
-            ) : allPass ? (
-              <span className="font-bold text-teal">✓ ALL SYSTEMS NOMINAL — {passed}/{total} green</span>
-            ) : (
-              <span className="font-bold text-alert">✗ {done - passed} CASE(S) NEED ATTENTION</span>
-            )}
-          </p>
-          <button
-            onClick={start}
-            disabled={running}
-            className="inline-flex items-center gap-2 border border-ink px-3.5 py-2 font-mono text-[11px] font-bold uppercase tracking-wider transition-all duration-200 hover:bg-ink hover:text-paper disabled:opacity-40"
-          >
-            <Icon name="pulse" className="h-3.5 w-3.5" /> Re-run suite
-          </button>
+        <div className="flex items-center justify-between gap-3 border-t-2 border-ink bg-paper px-5 py-3">
+          <ECGLine className="h-5 w-28 text-teal/60" />
+          {phase === "done" && (
+            <p
+              className={`font-mono text-[11px] font-bold tracking-widest ${
+                failed === 0 ? "text-teal" : "text-alert"
+              }`}
+            >
+              {failed === 0 ? "ALL SYSTEMS NOMINAL ✓" : `${failed} CASE(S) NEED ATTENTION`}
+            </p>
+          )}
+          {phase === "running" && (
+            <p className="type-caret font-mono text-[11px] tracking-widest text-inksoft">EXECUTING</p>
+          )}
         </div>
       </div>
     </div>

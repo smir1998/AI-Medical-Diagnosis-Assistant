@@ -278,6 +278,36 @@ export const TEST_CASES: Case[] = [
       return { pass: a === CHAT_FALLBACK, detail: a === CHAT_FALLBACK ? "fallback returned cleanly" : "unexpected match" };
     },
   },
+  {
+    id: "C6",
+    suite: "NLP DESK",
+    name: "\"Which Hugging Face models power this?\" → model-registry lineage answer",
+    run: () => {
+      const a = matchAnswer("Which Hugging Face models power this console?");
+      const ok = a !== CHAT_FALLBACK && a.includes("keremberke");
+      return { pass: ok, detail: ok ? "matched: HF model registry lineage" : `got: ${a.slice(0, 60)}…` };
+    },
+  },
+  {
+    id: "C7",
+    suite: "NLP DESK",
+    name: "Plain deploy question stays on the deploy answer (no HF-registry leakage)",
+    run: () => {
+      const a = matchAnswer("How do I deploy this on Render?");
+      const ok = a.includes("Render") && !a.includes("keremberke");
+      return { pass: ok, detail: ok ? "matched: deployment path, registry text absent" : `got: ${a.slice(0, 60)}…` };
+    },
+  },
+  {
+    id: "C8",
+    suite: "NLP DESK",
+    name: "\"Deploy with Hugging Face Spaces\" → registry answer wins on stronger keyword",
+    run: () => {
+      const a = matchAnswer("How do I deploy this with Hugging Face Spaces?");
+      const ok = a.includes("keremberke");
+      return { pass: ok, detail: ok ? "'hugging' (7 chars) outscored 'deploy' (6 chars) as intended" : `got: ${a.slice(0, 60)}…` };
+    },
+  },
 
   /* ----- D · derm screen ----- */
   {

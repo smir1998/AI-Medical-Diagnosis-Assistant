@@ -87,7 +87,9 @@ model.fit(X_train, y_train, epochs=10,
   );
 }
 
-/* ---------- evaluation ---------- */
+/**
+ * Displays confusion-matrix results and derived accuracy, precision, and recall metrics for the simulated PneumoNet v3 evaluation.
+ */
 
 export function Evaluation() {
   const total = CONFUSION.tp + CONFUSION.fp + CONFUSION.fn + CONFUSION.tn;
@@ -195,6 +197,12 @@ const TAG_STYLE: Record<string, string> = {
   multimodal: "bg-ink/10 text-ink border-ink/30",
 };
 
+/**
+ * Displays verified Hugging Face models associated with the console's diagnostic heads.
+ *
+ * Each model card links to its Hugging Face repository and presents its role, architecture,
+ * parameter count, training dataset, and headline metric.
+ */
 export function ModelRegistry() {
   return (
     <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-6">
@@ -302,7 +310,9 @@ export function ModelRegistry() {
   );
 }
 
-/* ---------- field notes: FAQ + dataset ---------- */
+/**
+ * Presents expandable medical-AI interview questions alongside a toy symptom dataset table.
+ */
 
 export function FieldNotes() {
   const [open, setOpen] = useState<number | null>(0);

@@ -24,6 +24,9 @@ const TABS: { id: Tab; label: string; icon: IconName; hint: string }[] = [
   { id: "chat", label: "NLP Desk", icon: "chat", hint: "medical Q&A" },
 ];
 
+/**
+ * Renders the MedLens diagnostic console for patient management, AI-assisted analysis, and educational model information.
+ */
 export default function App() {
   const [tab, setTab] = useState<Tab>("symptoms");
   const [pipeline, setPipeline] = useState({ stage: -1, running: false });

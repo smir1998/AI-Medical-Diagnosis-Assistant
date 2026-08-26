@@ -44,6 +44,12 @@ body {
     repeating-linear-gradient(90deg, rgba(143, 227, 207, 0.06) 0 1px, transparent 1px 24px);
 }
 
+/* below-the-fold sections skip layout/paint until near the viewport */
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 860px;
+}
+
 /* film grain over everything */
 .noise-overlay {
   position: fixed;

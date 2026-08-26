@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { TICKER_ITEMS } from "./data/medical";
 import type { ImageResult, SymptomResult } from "./lib/engine";
 import { nowTime } from "./lib/engine";
-import { TEST_CASES } from "./lib/tests";
 import { StatusBar } from "./components/StatusBar";
 import { SymptomChecker } from "./components/SymptomChecker";
 import { ImageAnalysis } from "./components/ImageAnalysis";
@@ -12,10 +11,29 @@ import { PatientRegistry, type Patient } from "./components/PatientRegistry";
 import { ReportPanel } from "./components/ReportPanel";
 import { HistoryPanel, ModelVitals, PipelinePanel, type HistoryEntry } from "./components/RailPanels";
 import { Evaluation, FieldNotes, InsideModel, ModelRegistry, setLiveMetrics } from "./components/InfoSections";
-import { TrainingGrounds } from "./components/TrainingGrounds";
 import type { TrainedModel } from "./lib/train";
-import { QABench } from "./components/QABench";
 import { CountUp, ECGLine, Icon, Reveal, Scramble, SectionTag, type IconName } from "./components/ui";
+
+/* Heavy module graphs load on demand: the QA bench (which drags in the whole
+   regression battery + trainer) only when opened, the Training Grounds just
+   before they scroll into view. InfoSections stays static — the repo's own
+   tests pin its import/render contract. */
+const TrainingGrounds = lazy(() =>
+  import("./components/TrainingGrounds").then((m) => ({ default: m.TrainingGrounds }))
+);
+const QABench = lazy(() => import("./components/QABench").then((m) => ({ default: m.QABench })));
+
+/* keep in sync with src/lib/tests.ts (the README QA tests assert the same count) */
+const QA_CASE_COUNT = 41;
+
+function ModuleFallback() {
+  return (
+    <div className="grid place-items-center border border-ink/15 bg-paperdeep/50 py-16">
+      <ECGLine className="h-8 w-44 text-teal/70" />
+      <p className="blink-soft mt-2 font-mono text-[10px] tracking-[0.26em] text-inksoft">LOADING MODULE</p>
+    </div>
+  );
+}
 
 type Tab = "symptoms" | "image" | "derm" | "chat";
 
@@ -170,7 +188,11 @@ export default function App() {
     <div id="top" className="min-h-screen">
       <div className="noise-overlay" aria-hidden="true" />
       <StatusBar onQA={() => setQaOpen(true)} />
-      {qaOpen && <QABench onClose={() => setQaOpen(false)} />}
+      {qaOpen && (
+        <Suspense fallback={null}>
+          <QABench onClose={() => setQaOpen(false)} />
+        </Suspense>
+      )}
 
       {/* ---------- triage board ---------- */}
       <section className="border-b border-ink/15">
@@ -343,12 +365,23 @@ export default function App() {
 
       <ECGLine className="block h-12 w-full text-teal/70" slow />
 
-      <InsideModel />
-      <Evaluation />
-      <TrainingGrounds onTrained={setTrainedModel} />
-      <Evaluation />
-      <ModelRegistry />
-      <FieldNotes />
+      <div className="cv-auto">
+        <InsideModel />
+      </div>
+      <div className="cv-auto">
+        <Suspense fallback={<ModuleFallback />}>
+          <TrainingGrounds onTrained={setTrainedModel} />
+        </Suspense>
+      </div>
+      <div className="cv-auto">
+        <Evaluation />
+      </div>
+      <div className="cv-auto">
+        <ModelRegistry />
+      </div>
+      <div className="cv-auto">
+        <FieldNotes />
+      </div>
 
       {/* ---------- footer ---------- */}
       <footer className="dark-grid border-t-4 border-alert text-paper">
@@ -384,7 +417,7 @@ export default function App() {
                 onClick={() => setQaOpen(true)}
                 className="group mt-5 inline-flex items-center gap-2 border border-mint/40 bg-mint/10 px-3.5 py-2 font-mono text-[10px] font-bold tracking-[0.2em] text-mint transition-all duration-200 hover:-translate-y-px hover:bg-mint hover:text-pine"
               >
-                <Icon name="check" className="h-3 w-3" /> RUN QA BENCH · {TEST_CASES.length} CASES
+                <Icon name="check" className="h-3 w-3" /> RUN QA BENCH · {QA_CASE_COUNT} CASES
               </button>
               <p className="mt-5 font-mono text-[10px] leading-relaxed tracking-wider text-paper/40">
                 MEDLENS·AI — DEEP LEARNING IN HEALTH CARE

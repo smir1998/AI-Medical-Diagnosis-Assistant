@@ -203,6 +203,8 @@ export function ImageAnalysis({ onComplete, onPipeline }: Props) {
                     setDims({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })
                   }
                   onError={() => setImgFailed(true)}
+                  loading="lazy"
+                  decoding="async"
                   className="mx-auto max-h-[340px] w-auto max-w-full border border-mint/25 object-contain"
                   draggable={false}
                 />

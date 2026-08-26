@@ -4,7 +4,7 @@
 /* ------------------------------------------------------------------ */
 
 import { analyzeSymptoms, predictImage, prefersReducedMotion } from "./engine";
-import { CHAT_FALLBACK, HF_MODEL_ZOO } from "../data/medical";
+import { CHAT_FALLBACK, HF_MODEL_ZOO, TICKER_ITEMS } from "../data/medical";
 import { matchAnswer } from "../components/Chatbot";
 import { analyzePixels, buildFlags } from "../components/DermScan";
 import {
@@ -269,6 +269,26 @@ export const TEST_CASES: Case[] = [
       return { pass: a === CHAT_FALLBACK, detail: a === CHAT_FALLBACK ? "fallback returned cleanly" : "unexpected match" };
     },
   },
+  {
+    id: "C6",
+    suite: "NLP DESK",
+    name: "“Which Hugging Face models power this?” → registry answer, not fallback",
+    run: () => {
+      const a = matchAnswer("Which Hugging Face models does this app actually use?");
+      const ok = a !== CHAT_FALLBACK && a.includes("keremberke");
+      return { pass: ok, detail: ok ? "matched: HF model registry lineage" : `got: ${a.slice(0, 60)}…` };
+    },
+  },
+  {
+    id: "C7",
+    suite: "NLP DESK",
+    name: "“How do I deploy with Streamlit?” still hits the deploy answer, unaffected by keyword split",
+    run: () => {
+      const a = matchAnswer("How do I deploy this with Streamlit or FastAPI?");
+      const ok = a.includes("Streamlit") && !a.includes("keremberke");
+      return { pass: ok, detail: ok ? "matched: deploy curriculum, no registry bleed-through" : `got: ${a.slice(0, 60)}…` };
+    },
+  },
 
   /* ----- D · derm screen ----- */
   {
@@ -401,6 +421,39 @@ export const TEST_CASES: Case[] = [
       return {
         pass: ok,
         detail: `vision=${vision} · nlp=${tags.includes("nlp")} · llm=${tags.includes("llm")} · mm=${tags.includes("multimodal")}`,
+      };
+    },
+  },
+  {
+    id: "M3",
+    suite: "MODEL ZOO",
+    name: "No duplicate registry entries: unique repo ids, unique console roles",
+    run: () => {
+      const repoIds = HF_MODEL_ZOO.map((m) => m.repoId);
+      const roles = HF_MODEL_ZOO.map((m) => m.role);
+      const uniqueRepos = new Set(repoIds).size === repoIds.length;
+      const uniqueRoles = new Set(roles).size === roles.length;
+      const coreHeads = ["Radiology Lab", "Derm Scan", "Symptom Lab", "NLP Desk"];
+      const coversCoreHeads = coreHeads.every((h) => roles.includes(h));
+      const ok = uniqueRepos && uniqueRoles && coversCoreHeads;
+      return {
+        pass: ok,
+        detail: `repos-unique=${uniqueRepos} · roles-unique=${uniqueRoles} · core-heads-covered=${coversCoreHeads}`,
+      };
+    },
+  },
+  {
+    id: "M4",
+    suite: "MODEL ZOO",
+    name: "Ticker copy stays in sync with the live model-zoo size",
+    run: () => {
+      const item = TICKER_ITEMS.find((t) => /model zoo/i.test(t));
+      const match = item?.match(/(\d+)\s+verified/i);
+      const claimed = match ? Number(match[1]) : NaN;
+      const ok = !!item && claimed === HF_MODEL_ZOO.length;
+      return {
+        pass: ok,
+        detail: item ? `ticker says ${claimed} · zoo has ${HF_MODEL_ZOO.length}` : "no model-zoo ticker item found",
       };
     },
   },

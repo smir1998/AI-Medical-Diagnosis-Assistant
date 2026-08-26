@@ -5,6 +5,7 @@
 
 import { analyzeSymptoms, predictImage, prefersReducedMotion } from "./engine";
 import { cosineSim } from "./semantic";
+import { predictWithModel, trainModel } from "./train";
 import { NB_MODEL, nbPosteriors } from "./naiveBayes";
 import { opacityToPneumonia, radiographStats } from "./pixel";
 import { TRAINING_ROWS } from "../data/training";
@@ -55,7 +56,8 @@ interface Case {
     | "SEMANTIC UTILS"
     | "PIXEL HEAD"
     | "TRAINED MODEL"
-    | "BUNDLE";
+    | "BUNDLE"
+    | "LIVE TRAINER";
   name: string;
   run: Run;
 }
@@ -547,6 +549,54 @@ export const TEST_CASES: Case[] = [
       const z = cosineSim([0, 0, 0], [1, 1, 1]);
       const ok = z === 0 && !Number.isNaN(z);
       return { pass: ok, detail: `zero-guard=${z}` };
+    },
+  },
+
+  /* ----- L · live trainer (SGD on the real disease–symptom dataset) ----- */
+  {
+    id: "L1",
+    suite: "LIVE TRAINER",
+    name: "SGD converges: cross-entropy drops ≥40% within 10 epochs",
+    run: async () => {
+      const m = await trainModel({ epochs: 10, rowsPerClass: 24 });
+      const first = m.lossHistory[0];
+      const last = m.lossHistory[m.lossHistory.length - 1];
+      const ok = last < first * 0.6;
+      return { pass: ok, detail: `loss ${first.toFixed(3)} → ${last.toFixed(3)}` };
+    },
+  },
+  {
+    id: "L2",
+    suite: "LIVE TRAINER",
+    name: "Measured held-out accuracy ≥ 70% on the real associations",
+    run: async () => {
+      const m = await trainModel({ epochs: 20, rowsPerClass: 32 });
+      return {
+        pass: m.metrics.accuracy >= 0.7,
+        detail: `acc=${(m.metrics.accuracy * 100).toFixed(1)}% · F1=${(m.metrics.macroF1 * 100).toFixed(1)}`,
+      };
+    },
+  },
+  {
+    id: "L3",
+    suite: "LIVE TRAINER",
+    name: "Deterministic: same seed ⇒ bit-identical measured accuracy",
+    run: async () => {
+      const a = await trainModel({ epochs: 8, rowsPerClass: 16 });
+      const b = await trainModel({ epochs: 8, rowsPerClass: 16 });
+      const ok = a.metrics.accuracy === b.metrics.accuracy;
+      return { pass: ok, detail: `acc=${(a.metrics.accuracy * 100).toFixed(2)}% on both runs` };
+    },
+  },
+  {
+    id: "L4",
+    suite: "LIVE TRAINER",
+    name: "Trained head: vomiting+diarrhea+nausea ⇒ Gastroenteritis #1",
+    run: async () => {
+      const m = await trainModel({ epochs: 24, rowsPerClass: 32 });
+      const preds = predictWithModel(m, ["vomiting", "diarrhea", "nausea"]);
+      const ok = preds.length > 0 && preds[0].name === "Gastroenteritis";
+      return { pass: ok, detail: `top=${preds[0]?.name ?? "∅"} @ ${((preds[0]?.prob ?? 0) * 100).toFixed(1)}%` };
     },
   },
 ];

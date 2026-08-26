@@ -12,6 +12,8 @@ import { PatientRegistry, type Patient } from "./components/PatientRegistry";
 import { ReportPanel } from "./components/ReportPanel";
 import { HistoryPanel, ModelVitals, PipelinePanel, type HistoryEntry } from "./components/RailPanels";
 import { Evaluation, FieldNotes, InsideModel, ModelRegistry } from "./components/InfoSections";
+import { TrainingGrounds } from "./components/TrainingGrounds";
+import type { TrainedModel } from "./lib/train";
 import { QABench } from "./components/QABench";
 import { CountUp, ECGLine, Icon, Reveal, Scramble, SectionTag, type IconName } from "./components/ui";
 
@@ -43,6 +45,7 @@ export default function App() {
     }
   });
   const [qaOpen, setQaOpen] = useState(false);
+  const [trainedModel, setTrainedModel] = useState<TrainedModel | null>(null);
 
   /* ---------- patient registry (persisted) ---------- */
   const [patients, setPatients] = useState<Patient[]>(() => {
@@ -334,7 +337,8 @@ export default function App() {
       <ECGLine className="block h-12 w-full text-teal/70" slow />
 
       <InsideModel />
-      <Evaluation />
+      <Evaluation liveMetrics={trainedModel?.metrics ?? null} />
+      <TrainingGrounds onTrained={setTrainedModel} />
       <ModelRegistry />
       <FieldNotes />
 

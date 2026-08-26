@@ -3,6 +3,7 @@ import { CONFUSION, FAQS, HF_MODEL_ZOO, SYMPTOMS, TRAINING_STEPS } from "../data
 import { TRAINING_ROWS, TRAINING_SOURCE, TRAINING_TOTAL_ROWS } from "../data/training";
 import { NB_ALPHA, NB_MODEL } from "../lib/naiveBayes";
 import { CountUp, ECGLine, Icon, Reveal, SectionTag } from "./ui";
+import type { ModelMetrics } from "../lib/train";
 
 /* ---------- inside the model: sticky two-column ---------- */
 
@@ -93,7 +94,7 @@ model.fit(X_train, y_train, epochs=10,
  * Displays confusion-matrix results and derived accuracy, precision, and recall metrics for the simulated PneumoNet v3 evaluation.
  */
 
-export function Evaluation() {
+export function Evaluation({ liveMetrics }: { liveMetrics?: ModelMetrics | null }) {
   const total = CONFUSION.tp + CONFUSION.fp + CONFUSION.fn + CONFUSION.tn;
   const metrics = [
     { label: "Accuracy", v: ((CONFUSION.tp + CONFUSION.tn) / total) * 100, cls: "bg-teal" },
@@ -174,13 +175,40 @@ export function Evaluation() {
 
               <div className="border border-mint/20 bg-paper/5 p-4">
                 <p className="flex items-center gap-2 font-mono text-[10px] font-bold tracking-[0.22em] text-mint/70">
-                  <Icon name="layers" className="h-3.5 w-3.5" /> PRODUCTION LINEAGE
+                  <Icon name="layers" className="h-3.5 w-3.5" />{" "}
+                  {liveMetrics ? "SYMPTOM ENCODER · MEASURED LIVE" : "PRODUCTION LINEAGE"}
+                  {liveMetrics && <span className="blink-soft ml-auto text-mint">● TRAINED</span>}
                 </p>
-                <p className="mt-2 text-[13px] leading-relaxed text-paper/70">
-                  These bars score the simulated PneumoNet v3 head. A clinical deployment swaps in the
-                  verified Hugging Face models from the <span className="text-mint">Model Registry</span>{" "}
-                  below — same pipeline, real weights.
-                </p>
+                {liveMetrics ? (
+                  <>
+                    <div className="mt-3 grid grid-cols-4 gap-2 text-center">
+                      {[
+                        { k: "ACC", v: liveMetrics.accuracy },
+                        { k: "PREC", v: liveMetrics.macroPrecision },
+                        { k: "REC", v: liveMetrics.macroRecall },
+                        { k: "F1", v: liveMetrics.macroF1 },
+                      ].map((m) => (
+                        <div key={m.k} className="border border-mint/20 bg-pinedeep/60 py-2">
+                          <p className="font-mono text-[8px] tracking-[0.18em] text-paper/45">{m.k}</p>
+                          <p className="mt-0.5 font-display text-base font-black tabular-nums text-mint">
+                            {(m.v * 100).toFixed(1)}%
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-2.5 text-[12px] leading-relaxed text-paper/70">
+                      Computed on {liveMetrics.testRows} held-out rows by the trainer in the Training
+                      Grounds below — <span className="text-mint">measured, not invented</span>.
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-2 text-[13px] leading-relaxed text-paper/70">
+                    These bars score the simulated PneumoNet v3 head. A clinical deployment swaps in the
+                    verified Hugging Face models from the <span className="text-mint">Model Registry</span>{" "}
+                    below — and the <span className="text-mint">Training Grounds</span> replace the symptom
+                    encoder's numbers with live-measured ones.
+                  </p>
+                )}
               </div>
             </div>
           </Reveal>

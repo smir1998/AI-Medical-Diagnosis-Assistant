@@ -4,7 +4,7 @@
 > X-ray CNN, a dermoscopy classifier and a medical NLP desk into one decision-support console.
 
 [![Live on GitHub Pages](https://img.shields.io/badge/LIVE-GitHub%20Pages-0e7c72)](https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/)
-[![QA Bench](https://img.shields.io/badge/QA-34%20cases%20in--browser-16241f)](https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/)
+[![QA Bench](https://img.shields.io/badge/QA-38%20cases%20in--browser-16241f)](https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-a16207.svg)](LICENSE)
 
 ⚠️ **Educational simulation only.** MedLens is a learning tool — its predictions are deterministic
@@ -24,7 +24,8 @@ toy-model outputs, not clinical diagnoses. Never use it as a substitute for prof
 | **Derm Scan** | CLAHE → Otsu ROI → 3-class EfficientNet-style head + ABCDE rule engine | Benign / atypical / melanoma-pattern screening with pixel-statistics heuristic |
 | **NLP Desk** | Keyword-weighted medical Q&A | Answers CNN / normalization / transfer-learning / precision-recall questions |
 | **Report Engine** | Multi-modal report compilation | Printable patient analysis report (Print → PDF), referral recommendations |
-| **QA Bench** | 34-case in-browser regression suite | Tests the live engine: NB posterior invariants, priors/likelihoods from data, red-flag rules, determinism, pixel-head monotonicity, registrar validation, vitals flags, CSV export, HF model-registry integrity, semantic-engine math |
+| **Training Grounds** | Live SGD trainer on the real [Disease-Symptom dataset](https://www.kaggle.com/datasets/itachi9604/disease-symptom-description-dataset) | Trains a multinomial logistic head in-browser on real disease–symptom associations; accuracy/precision/recall/F1 are **measured on a held-out split**, not invented — with a live loss curve and inference from the trained weights |
+| **QA Bench** | 38-case in-browser regression suite | Tests the live engine: NB posterior invariants, priors/likelihoods from data, red-flag rules, determinism, pixel-head monotonicity, live-trainer convergence & measured accuracy, registrar validation, vitals flags, CSV export, HF model-registry integrity, semantic-engine math |
 | **Model Registry** | Verified Hugging Face Hub lineage | Production model for every head (below), linked to live model pages |
 
 ## Model lineage (Hugging Face Hub)

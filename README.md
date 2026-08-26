@@ -4,7 +4,7 @@
 > X-ray CNN, a dermoscopy classifier and a medical NLP desk into one decision-support console.
 
 [![Live on GitHub Pages](https://img.shields.io/badge/LIVE-GitHub%20Pages-0e7c72)](https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/)
-[![QA Bench](https://img.shields.io/badge/QA-24%20cases%20in--browser-16241f)](https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/)
+[![QA Bench](https://img.shields.io/badge/QA-28%20cases%20in--browser-16241f)](https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-a16207.svg)](LICENSE)
 
 ⚠️ **Educational simulation only.** MedLens is a learning tool — its predictions are deterministic
@@ -24,7 +24,7 @@ toy-model outputs, not clinical diagnoses. Never use it as a substitute for prof
 | **Derm Scan** | CLAHE → Otsu ROI → 3-class EfficientNet-style head + ABCDE rule engine | Benign / atypical / melanoma-pattern screening with pixel-statistics heuristic |
 | **NLP Desk** | Keyword-weighted medical Q&A | Answers CNN / normalization / transfer-learning / precision-recall questions |
 | **Report Engine** | Multi-modal report compilation | Printable patient analysis report (Print → PDF), referral recommendations |
-| **QA Bench** | 26-case in-browser regression suite | Tests the live engine: softmax invariants, red-flag rules, determinism, edge cases, registrar validation, vitals flags, CSV export, HF model-registry integrity |
+| **QA Bench** | 28-case in-browser regression suite | Tests the live engine: softmax invariants, red-flag rules, determinism, edge cases, registrar validation, vitals flags, CSV export, HF model-registry integrity, semantic-engine math |
 | **Model Registry** | Verified Hugging Face Hub lineage | Production model for every head (below), linked to live model pages |
 
 ## Model lineage (Hugging Face Hub)
@@ -38,6 +38,14 @@ The console runs deterministic teaching heads; these are the real models a clini
 | Symptom Lab | [`microsoft/BiomedNLP-PubMedBERT`](https://huggingface.co/microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext) | PubMedBERT-base (110M) | 3.1B words of PubMed text |
 | NLP Desk | [`epfl-llm/meditron-7b`](https://huggingface.co/epfl-llm/meditron-7b) | Meditron · Llama-2 (7B) | ≈48B tokens · PubMed + clinical guidelines |
 | Vision foundation | [`microsoft/BiomedCLIP`](https://huggingface.co/microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224) | ViT-B/16 + PubMedBERT (196M) | PMC-15M image–text pairs |
+
+### Running in-browser right now
+
+[`Xenova/all-MiniLM-L6-v2`](https://huggingface.co/Xenova/all-MiniLM-L6-v2) — ONNX q8, ≈22.7 MB — is loaded on demand
+via **Transformers.js** and powers the Symptom Lab's *Semantic Engine*: the patient's free-text chief complaint and
+all 24 indexed symptom labels are encoded into 384-dim vectors and ranked by cosine similarity (threshold 0.22).
+Weights are cached by the browser after the first pull; inference is fully client-side. The clinical heads above
+still require ONNX exports of their fine-tuned checkpoints (or a FastAPI model server) before they can run the same way.
 
 ## System architecture
 

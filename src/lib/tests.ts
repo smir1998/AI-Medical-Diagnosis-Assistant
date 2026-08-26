@@ -4,6 +4,7 @@
 /* ------------------------------------------------------------------ */
 
 import { analyzeSymptoms, predictImage, prefersReducedMotion } from "./engine";
+import { cosineSim } from "./semantic";
 import { CHAT_FALLBACK, HF_MODEL_ZOO } from "../data/medical";
 import { matchAnswer } from "../components/Chatbot";
 import { analyzePixels, buildFlags } from "../components/DermScan";
@@ -41,7 +42,7 @@ type Run = () => { pass: boolean; detail: string } | Promise<{ pass: boolean; de
 
 interface Case {
   id: string;
-  suite: "SYMPTOM NLP" | "RADIOLOGY CNN" | "NLP DESK" | "DERM SCREEN" | "REGISTRAR" | "MODEL ZOO";
+  suite: "SYMPTOM NLP" | "RADIOLOGY CNN" | "NLP DESK" | "DERM SCREEN" | "REGISTRAR" | "MODEL ZOO" | "SEMANTIC UTILS";
   name: string;
   run: Run;
 }
@@ -402,6 +403,29 @@ export const TEST_CASES: Case[] = [
         pass: ok,
         detail: `vision=${vision} · nlp=${tags.includes("nlp")} · llm=${tags.includes("llm")} · mm=${tags.includes("multimodal")}`,
       };
+    },
+  },
+
+  /* ----- S · semantic utils (real-model math) ----- */
+  {
+    id: "S1",
+    suite: "SEMANTIC UTILS",
+    name: "Cosine: identical vectors → 1, orthogonal → 0",
+    run: () => {
+      const id = cosineSim([1, 2, 3], [1, 2, 3]);
+      const ortho = cosineSim([1, 0], [0, 1]);
+      const ok = near(id, 1, 1e-9) && near(ortho, 0, 1e-9);
+      return { pass: ok, detail: `identical=${id.toFixed(6)} · orthogonal=${ortho.toFixed(6)}` };
+    },
+  },
+  {
+    id: "S2",
+    suite: "SEMANTIC UTILS",
+    name: "Cosine: zero-vector guard returns 0, never NaN",
+    run: () => {
+      const z = cosineSim([0, 0, 0], [1, 1, 1]);
+      const ok = z === 0 && !Number.isNaN(z);
+      return { pass: ok, detail: `zero-guard=${z}` };
     },
   },
 ];

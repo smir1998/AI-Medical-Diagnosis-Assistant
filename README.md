@@ -1,0 +1,84 @@
+# MedLens·AI — Medical Diagnosis Assistant
+
+> **Deep Learning in Health Care** — an AI triage workstation combining a symptom encoder, a chest
+> X-ray CNN, a dermoscopy classifier and a medical NLP desk into one decision-support console.
+
+[![Live on GitHub Pages](https://img.shields.io/badge/LIVE-GitHub%20Pages-0e7c72)](https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/)
+[![QA Bench](https://img.shields.io/badge/QA-20%20cases%20in--browser-16241f)](https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-a16207.svg)](LICENSE)
+
+⚠️ **Educational simulation only.** MedLens is a learning tool — its predictions are deterministic
+toy-model outputs, not clinical diagnoses. Never use it as a substitute for professional medical advice.
+
+![MedLens console](https://image.qwenlm.ai/generated-images/597b72cb-81ed-4bdb-8a36-76013216f5ee/_result.png)
+
+---
+
+## What's inside
+
+| Module | Technique | What it does |
+| --- | --- | --- |
+| **Symptom Lab** | NLP-encoded feature vector → softmax over 12 disease profiles | Differential diagnosis with confidence, ICD-10 codes, severity tiers, red-flag rules |
+| **Radiology Lab** | Simulated CNN (Conv→Pool→Dense→softmax) with Grad-CAM-style hotspot | Pneumonia vs Normal classification on uploaded or sample chest X-rays |
+| **Derm Scan** | CLAHE → Otsu ROI → 3-class EfficientNet-style head + ABCDE rule engine | Benign / atypical / melanoma-pattern screening with pixel-statistics heuristic |
+| **NLP Desk** | Keyword-weighted medical Q&A | Answers CNN / normalization / transfer-learning / precision-recall questions |
+| **Report Engine** | Multi-modal report compilation | Printable patient analysis report (Print → PDF), referral recommendations |
+| **QA Bench** | 20-case in-browser regression suite | Tests the live engine: softmax invariants, red-flag rules, determinism, edge cases |
+
+## System architecture
+
+```
+Patient Input ──► Preprocessing ──► CNN / Encoder ──► Softmax ──► Report
+(symptoms,        (resize 224,       (Conv→Pool→       (class        (findings,
+ radiographs,      ÷255, one-hot)      Dense head)      posteriors)    referral)
+ dermoscopy)
+```
+
+## Curriculum coverage (all 13 steps)
+
+1. **Dataset** — tabular symptom table + chest X-ray classes + ISIC-style dermoscopy
+2. **Libraries** — TensorFlow/OpenCV/Pandas/Streamlit path documented in the pipeline walkthrough
+3. **Image loading** — upload, drag-drop, `cv2.imread` semantics in the trace
+4. **Normalization** — `÷255` shown live, with the "why" explained
+5. **CNN build** — full `Sequential` Conv2D/MaxPooling2D/Flatten/Dense architecture
+6. **Compile** — `adam` + `categorical_crossentropy`
+7. **Train** — `model.fit(..., epochs=10, validation_data=...)`
+8. **Predict** — two-class softmax with confidence bars
+9. **Symptom diagnosis** — 24-dim one-hot vector → 12-profile differential
+10. **AI report** — auto-generated patient analysis document
+11. **Interface** — interactive console (React SPA instead of Streamlit)
+12. **Evaluation** — confusion matrix, accuracy / precision / recall, model cards
+13. **Deploy** — GitHub Pages via GitHub Actions
+
+## Run locally
+
+```bash
+npm install
+npm run dev        # develop
+npm run build      # production build
+```
+
+## Project structure
+
+```
+├── src/
+│   ├── components/      # StatusBar, labs, report, rail panels, QA bench, info sections
+│   ├── data/medical.ts  # knowledge base: 24 symptoms, 12 diseases, chat KB, FAQs
+│   ├── lib/engine.ts    # deterministic inference: hashing, softmax, prediction
+│   ├── lib/tests.ts     # 20-case regression suite
+│   └── App.tsx          # triage console shell
+├── .github/workflows/   # GitHub Pages deployment
+└── README.md
+```
+
+## Screenshots
+
+Drop captures into `docs/` and link them here:
+
+```markdown
+![Symptom Lab](docs/symptom-lab.png)
+```
+
+## License
+
+MIT — see [LICENSE](LICENSE).

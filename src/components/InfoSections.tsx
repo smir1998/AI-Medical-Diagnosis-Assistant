@@ -1,10 +1,28 @@
-import { useState } from "react";
+import { useSyncExternalStore, useState } from "react";
 import { CONFUSION, FAQS, HF_MODEL_ZOO, SYMPTOMS, TRAINING_STEPS } from "../data/medical";
 import { TRAINING_ROWS, TRAINING_SOURCE, TRAINING_TOTAL_ROWS } from "../data/training";
 import { NB_ALPHA, NB_MODEL } from "../lib/naiveBayes";
-import { CONFUSION, FAQS, HF_MODEL_ZOO, SAMPLE_DATASET, TRAINING_STEPS } from "../data/medical";
-import { CountUp, ECGLine, Icon, Reveal, SectionTag } from "./ui";
 import type { ModelMetrics } from "../lib/train";
+import { CountUp, ECGLine, Icon, Reveal, SectionTag } from "./ui";
+
+/* ---------- live metrics store (fed by the Training Grounds) ---------- */
+
+let liveMetrics: ModelMetrics | null = null;
+const metricsListeners = new Set<() => void>();
+
+export function setLiveMetrics(m: ModelMetrics | null): void {
+  liveMetrics = m;
+  metricsListeners.forEach((l) => l());
+}
+
+function subscribeLiveMetrics(cb: () => void): () => void {
+  metricsListeners.add(cb);
+  return () => metricsListeners.delete(cb);
+}
+
+function useLiveMetrics(): ModelMetrics | null {
+  return useSyncExternalStore(subscribeLiveMetrics, () => liveMetrics);
+}
 
 /* ---------- inside the model: sticky two-column ---------- */
 
@@ -95,7 +113,8 @@ model.fit(X_train, y_train, epochs=10,
  * Displays confusion-matrix results and derived accuracy, precision, and recall metrics for the simulated PneumoNet v3 evaluation.
  */
 
-export function Evaluation({ liveMetrics }: { liveMetrics?: ModelMetrics | null }) {
+export function Evaluation() {
+  const liveMetrics = useLiveMetrics();
   const total = CONFUSION.tp + CONFUSION.fp + CONFUSION.fn + CONFUSION.tn;
   const metrics = [
     { label: "Accuracy", v: ((CONFUSION.tp + CONFUSION.tn) / total) * 100, cls: "bg-teal" },

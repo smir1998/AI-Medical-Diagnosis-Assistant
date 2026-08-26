@@ -1,26 +1,30 @@
-# ⚠️ INTENTIONALLY INERT — do not re-enable.
+# ============================================================================
+# INTENTIONALLY INERT — DO NOT RE-ENABLE.
 #
-# GitHub offered this workflow when Pages was first configured, but this
-# repository is a Vite SPA, not a Jekyll site. An active Jekyll deployer:
-#   1. fights deploy.yml for the single 'pages' environment (random 409s /
-#      cancelled runs), and
-#   2. "succeeds" by serving the repo root, where index.html points at
-#      /src/main.tsx — a path that is never deployed — so the site renders
-#      blank even on green runs.
+# This file exists ONLY to overwrite GitHub's default "Deploy Jekyll with
+# GitHub Pages dependencies preinstalled" workflow, which fights the Vite
+# pipeline (deploy.yml) for the same github-pages environment and serves the
+# repo root — producing a blank site even on green runs.
 #
-# deploy.yml (Vite build → dist/) is the ONLY Pages deployer.
-# This file stays checked in with no push trigger so nothing re-activates it.
+# The single real deployer is .github/workflows/deploy.yml.
+# If Pages ever serves stale/blank content again, check Settings → Pages →
+# Source is "GitHub Actions", and that no other workflow mentions the
+# "github-pages" environment with a push trigger.
+# ============================================================================
 
 name: Deploy Jekyll with GitHub Pages dependencies preinstalled
 
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   noop:
     runs-on: ubuntu-latest
     steps:
-      - name: Superseded by deploy.yml
+      - name: Disabled by design
         run: |
-          echo "This Jekyll deployer is intentionally disabled."
-          echo "The Vite SPA is deployed by .github/workflows/deploy.yml."
+          echo "This Jekyll deployer is intentionally inert."
+          echo "The real Pages pipeline is .github/workflows/deploy.yml (Vite)."

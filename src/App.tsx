@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { Component, lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { TICKER_ITEMS } from "./data/medical";
 import type { ImageResult, SymptomResult } from "./lib/engine";
 import { nowTime } from "./lib/engine";
@@ -25,6 +25,47 @@ const QABench = lazy(() => import("./components/QABench").then((m) => ({ default
 
 /* keep in sync with src/lib/tests.ts (the README QA tests assert the same count) */
 const QA_CASE_COUNT = 41;
+
+/* ------------------------------------------------------------------ */
+/*  Fault boundary: a crash in any section renders a readable fault    */
+/*  panel instead of blanking the whole console.                       */
+/* ------------------------------------------------------------------ */
+class FaultBoundary extends Component<{ children: ReactNode }, { err: Error | null }> {
+  state = { err: null as Error | null };
+
+  static getDerivedStateFromError(err: Error) {
+    return { err };
+  }
+
+  render() {
+    if (!this.state.err) return this.props.children;
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
+        <div className="border-2 border-alert bg-paper p-6 shadow-[8px_8px_0_0_rgba(140,47,39,0.55)]">
+          <p className="flex items-center gap-2 font-mono text-[10px] font-bold tracking-[0.28em] text-alert">
+            ⚠ SYSTEM FAULT — SECTION ISOLATED
+          </p>
+          <h2 className="mt-3 font-display text-2xl font-black tracking-tight">
+            A module threw an exception.
+          </h2>
+          <p className="mt-2 break-words font-mono text-xs leading-relaxed text-inksoft">
+            {this.state.err.message}
+          </p>
+          <p className="mt-3 text-sm leading-relaxed text-inksoft">
+            The rest of the console is unaffected. A reload clears transient state; if it persists,
+            clearing this site's local storage resets the persisted registry and logs.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-5 inline-flex items-center gap-2 bg-pine px-5 py-2.5 font-display text-xs font-extrabold uppercase tracking-wider text-paper transition-all duration-200 hover:-translate-y-0.5 hover:bg-teal"
+          >
+            Restart console
+          </button>
+        </div>
+      </div>
+    );
+  }
+}
 
 function ModuleFallback() {
   return (
@@ -227,7 +268,8 @@ export default function App() {
   };
 
   return (
-    <div id="top" className="min-h-screen">
+    <div id="top" data-app-mounted className="min-h-screen">
+      <FaultBoundary>
       <div className="noise-overlay" aria-hidden="true" />
       <StatusBar onQA={() => setQaOpen(true)} />
       {qaOpen && (
@@ -474,6 +516,7 @@ export default function App() {
           </div>
         </div>
       </footer>
+      </FaultBoundary>
     </div>
   );
 }

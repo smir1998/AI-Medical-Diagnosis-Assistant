@@ -1,8 +1,7 @@
 # Deploys the Vite SPA to GitHub Pages.
 # One-time setup: repo Settings → Pages → Source: "GitHub Actions".
-# NOTE: jekyll-gh-pages.yml in this repo is intentionally inert — this
-# workflow is the ONLY Pages deployer (two deployers fight for the
-# 'pages' environment and Jekyll serves a broken site).
+# NOTE: jekyll-gh-pages.yml in this tree is intentionally inert — this is the
+# ONLY workflow allowed to deploy to the github-pages environment.
 
 name: Deploy to GitHub Pages
 
@@ -38,12 +37,6 @@ jobs:
       - name: Build (--base=./ for Pages sub-path)
         run: npm run build -- --base=./
 
-      - name: Detect competing Pages deployers
-        run: |
-          if [ -f .github/workflows/jekyll-gh-pages.yml ] && grep -q "actions/deploy-pages" .github/workflows/jekyll-gh-pages.yml; then
-            echo "::warning::A second, ACTIVE Pages deployer (jekyll-gh-pages.yml) was found in this tree. It fights deploy.yml for the 'pages' environment and serves a broken site. Restore the inert version shipped by this repo."
-          fi
-
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -56,6 +49,17 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Detect competing Pages deployers
+        run: |
+          for wf in .github/workflows/*.yml; do
+            [ "$wf" = ".github/workflows/deploy.yml" ] && continue
+            if grep -l "environment: github-pages" "$wf" >/dev/null 2>&1 \
+               && grep -l "on:" "$wf" >/dev/null 2>&1 \
+               && grep -A3 "^on:" "$wf" | grep -q "push"; then
+              echo "::warning::$wf appears to deploy to github-pages on push — two deployers fight for the same environment. Keep only deploy.yml (or the inert jekyll-gh-pages.yml shipped in this repo)."
+            fi
+          done
+
       - name: Verify GitHub Pages is enabled
         run: |
           status=$(curl -s -o /dev/null -w "%{http_code}" \

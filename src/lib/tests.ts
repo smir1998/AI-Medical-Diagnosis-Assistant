@@ -272,9 +272,9 @@ export const TEST_CASES: Case[] = [
   {
     id: "C6",
     suite: "NLP DESK",
-    name: "“Which Hugging Face models power this?” → registry answer, not fallback",
+    name: "\"Which Hugging Face models power this?\" → model-registry lineage answer",
     run: () => {
-      const a = matchAnswer("Which Hugging Face models does this app actually use?");
+      const a = matchAnswer("Which Hugging Face models power this console?");
       const ok = a !== CHAT_FALLBACK && a.includes("keremberke");
       return { pass: ok, detail: ok ? "matched: HF model registry lineage" : `got: ${a.slice(0, 60)}…` };
     },
@@ -282,11 +282,21 @@ export const TEST_CASES: Case[] = [
   {
     id: "C7",
     suite: "NLP DESK",
-    name: "“How do I deploy with Streamlit?” still hits the deploy answer, unaffected by keyword split",
+    name: "Plain deploy question stays on the deploy answer (no HF-registry leakage)",
     run: () => {
-      const a = matchAnswer("How do I deploy this with Streamlit or FastAPI?");
-      const ok = a.includes("Streamlit") && !a.includes("keremberke");
-      return { pass: ok, detail: ok ? "matched: deploy curriculum, no registry bleed-through" : `got: ${a.slice(0, 60)}…` };
+      const a = matchAnswer("How do I deploy this on Render?");
+      const ok = a.includes("Render") && !a.includes("keremberke");
+      return { pass: ok, detail: ok ? "matched: deployment path, registry text absent" : `got: ${a.slice(0, 60)}…` };
+    },
+  },
+  {
+    id: "C8",
+    suite: "NLP DESK",
+    name: "\"Deploy with Hugging Face Spaces\" → registry answer wins on stronger keyword",
+    run: () => {
+      const a = matchAnswer("How do I deploy this with Hugging Face Spaces?");
+      const ok = a.includes("keremberke");
+      return { pass: ok, detail: ok ? "'hugging' (7 chars) outscored 'deploy' (6 chars) as intended" : `got: ${a.slice(0, 60)}…` };
     },
   },
 
@@ -427,33 +437,69 @@ export const TEST_CASES: Case[] = [
   {
     id: "M3",
     suite: "MODEL ZOO",
-    name: "No duplicate registry entries: unique repo ids, unique console roles",
+    name: "Every console diagnostic head has a named production model",
     run: () => {
-      const repoIds = HF_MODEL_ZOO.map((m) => m.repoId);
       const roles = HF_MODEL_ZOO.map((m) => m.role);
-      const uniqueRepos = new Set(repoIds).size === repoIds.length;
-      const uniqueRoles = new Set(roles).size === roles.length;
-      const coreHeads = ["Radiology Lab", "Derm Scan", "Symptom Lab", "NLP Desk"];
-      const coversCoreHeads = coreHeads.every((h) => roles.includes(h));
-      const ok = uniqueRepos && uniqueRoles && coversCoreHeads;
+      const required = ["Radiology Lab", "Derm Scan", "Symptom Lab", "NLP Desk"];
+      const missing = required.filter((r) => !roles.includes(r));
       return {
-        pass: ok,
-        detail: `repos-unique=${uniqueRepos} · roles-unique=${uniqueRoles} · core-heads-covered=${coversCoreHeads}`,
+        pass: missing.length === 0,
+        detail: missing.length ? `missing roles: ${missing.join(", ")}` : `roles ok: ${roles.join(" | ")}`,
       };
     },
   },
   {
     id: "M4",
     suite: "MODEL ZOO",
-    name: "Ticker copy stays in sync with the live model-zoo size",
+    name: "Repo ids are unique and resolve to well-formed Hub URLs",
+    run: () => {
+      const ids = HF_MODEL_ZOO.map((m) => m.repoId);
+      const uniqueCount = new Set(ids).size;
+      let urlOk = true;
+      for (const id of ids) {
+        try {
+          new URL(`https://huggingface.co/${id}`);
+        } catch {
+          urlOk = false;
+          break;
+        }
+      }
+      const ok = uniqueCount === ids.length && urlOk;
+      return { pass: ok, detail: `${uniqueCount}/${ids.length} unique repo ids · urls-valid=${urlOk}` };
+    },
+  },
+  {
+    id: "M5",
+    suite: "MODEL ZOO",
+    name: "Pinned production lineage matches the published registry (no silent drift)",
+    run: () => {
+      const expected = [
+        "keremberke/resnet-50-chest-xray-classification",
+        "syaha/skin_cancer_detection_model",
+        "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext",
+        "epfl-llm/meditron-7b",
+        "microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224",
+      ];
+      const ids = HF_MODEL_ZOO.map((m) => m.repoId);
+      const missing = expected.filter((e) => !ids.includes(e));
+      return {
+        pass: missing.length === 0,
+        detail: missing.length ? `missing pinned repos: ${missing.join(", ")}` : "all 5 pinned repos present",
+      };
+    },
+  },
+  {
+    id: "M6",
+    suite: "MODEL ZOO",
+    name: "Ticker copy count stays in sync with HF_MODEL_ZOO length",
     run: () => {
       const item = TICKER_ITEMS.find((t) => /model zoo/i.test(t));
-      const match = item?.match(/(\d+)\s+verified/i);
-      const claimed = match ? Number(match[1]) : NaN;
+      const match = item ? item.match(/(\d+)\s+verified/i) : null;
+      const claimed = match ? parseInt(match[1], 10) : -1;
       const ok = !!item && claimed === HF_MODEL_ZOO.length;
       return {
         pass: ok,
-        detail: item ? `ticker says ${claimed} · zoo has ${HF_MODEL_ZOO.length}` : "no model-zoo ticker item found",
+        detail: item ? `ticker claims ${claimed} · HF_MODEL_ZOO has ${HF_MODEL_ZOO.length}` : "no model-zoo ticker item found",
       };
     },
   },

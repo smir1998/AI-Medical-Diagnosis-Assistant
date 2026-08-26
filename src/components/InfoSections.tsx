@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CONFUSION, FAQS, MODEL_CARDS, SAMPLE_DATASET, TRAINING_STEPS } from "../data/medical";
+import { CONFUSION, FAQS, HF_MODEL_ZOO, SAMPLE_DATASET, TRAINING_STEPS } from "../data/medical";
 import { CountUp, ECGLine, Icon, Reveal, SectionTag } from "./ui";
 
 /* ---------- inside the model: sticky two-column ---------- */
@@ -168,22 +168,115 @@ export function Evaluation() {
                 </div>
               ))}
 
-              <div className="grid gap-3 pt-2 sm:grid-cols-2">
-                {MODEL_CARDS.map((m) => (
-                  <div key={m.name} className="border border-mint/20 bg-paper/5 p-4 transition-colors hover:border-mint/50">
-                    <p className="font-display text-sm font-extrabold text-paper">{m.name}</p>
-                    <p className="mt-0.5 font-mono text-[10px] text-paper/50">{m.arch}</p>
-                    <p className="mt-0.5 font-mono text-[10px] text-paper/50">{m.dataset}</p>
-                    <p className="mt-2 font-mono text-[10px] tracking-widest text-mint/80">
-                      P {m.prec} · R {m.rec} · F1 {m.f1}
-                    </p>
-                  </div>
-                ))}
+              <div className="border border-mint/20 bg-paper/5 p-4">
+                <p className="flex items-center gap-2 font-mono text-[10px] font-bold tracking-[0.22em] text-mint/70">
+                  <Icon name="layers" className="h-3.5 w-3.5" /> PRODUCTION LINEAGE
+                </p>
+                <p className="mt-2 text-[13px] leading-relaxed text-paper/70">
+                  These bars score the simulated PneumoNet v3 head. A clinical deployment swaps in the
+                  verified Hugging Face models from the <span className="text-mint">Model Registry</span>{" "}
+                  below — same pipeline, real weights.
+                </p>
               </div>
             </div>
           </Reveal>
         </div>
       </div>
+    </section>
+  );
+}
+
+/* ---------- model registry: verified Hugging Face lineage ---------- */
+
+const TAG_STYLE: Record<string, string> = {
+  vision: "bg-teal/15 text-teal border-teal/40",
+  nlp: "bg-amber/15 text-amber border-amber/40",
+  llm: "bg-alert/15 text-alert border-alert/40",
+  multimodal: "bg-ink/10 text-ink border-ink/30",
+};
+
+export function ModelRegistry() {
+  return (
+    <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-6">
+      <Reveal>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <SectionTag>Model registry</SectionTag>
+            <h2 className="mt-4 font-display text-4xl font-black tracking-tight sm:text-5xl">
+              Real weights,
+              <br />
+              from the <span className="text-teal">Hub.</span>
+            </h2>
+          </div>
+          <p className="max-w-md text-sm leading-relaxed text-inksoft">
+            The console runs deterministic teaching heads so the math stays visible. These are the
+            verified <span className="font-semibold text-ink">Hugging Face Hub</span> models a production
+            deployment would load — one per diagnostic head, plus a biomedical vision-language
+            foundation model. Every card links to its model page.
+          </p>
+        </div>
+      </Reveal>
+
+      <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-5 lg:grid-rows-1">
+        {HF_MODEL_ZOO.map((m, i) => (
+          <Reveal key={m.repoId} delay={i * 80} className="h-full">
+            <a
+              href={`https://huggingface.co/${m.repoId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex h-full flex-col border-2 border-ink bg-paper p-4 transition-all duration-300 hover:-translate-y-1.5 hover:border-teal hover:shadow-[7px_7px_0_0_rgba(14,124,114,0.85)]"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span
+                  className={`border px-1.5 py-0.5 font-mono text-[8px] font-bold tracking-[0.18em] uppercase ${TAG_STYLE[m.tag]}`}
+                >
+                  {m.tag}
+                </span>
+                <span className="font-mono text-[9px] tracking-widest text-inksoft">
+                  backs → {m.role.toUpperCase()}
+                </span>
+              </div>
+
+              <p className="mt-3 break-all font-mono text-[11px] font-semibold leading-snug text-teal underline-offset-2 group-hover:underline">
+                {m.repoId}
+                <span className="ml-1 inline-block transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
+                  ↗
+                </span>
+              </p>
+
+              <p className="mt-2 font-display text-[15px] font-extrabold leading-tight">{m.name}</p>
+
+              <dl className="mt-3 space-y-1.5 border-t border-dashed border-ink/20 pt-3 font-mono text-[10px] leading-relaxed">
+                <div className="flex justify-between gap-2">
+                  <dt className="shrink-0 text-inksoft/70">ARCH</dt>
+                  <dd className="text-right text-ink">{m.arch}</dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt className="shrink-0 text-inksoft/70">PARAMS</dt>
+                  <dd className="tabular-nums text-ink">{m.params}</dd>
+                </div>
+                <div>
+                  <dt className="text-inksoft/70">TRAINED ON</dt>
+                  <dd className="text-ink">{m.dataset}</dd>
+                </div>
+                <div>
+                  <dt className="text-inksoft/70">HEADLINE</dt>
+                  <dd className="font-semibold text-teal">{m.metric}</dd>
+                </div>
+              </dl>
+            </a>
+          </Reveal>
+        ))}
+      </div>
+
+      <Reveal delay={120}>
+        <p className="mt-6 flex items-start gap-2 border-l-2 border-amber pl-3 font-mono text-[11px] leading-relaxed text-inksoft">
+          <Icon name="warn" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber" />
+          Loading these in-browser is possible via Transformers.js for a graduation project — the
+          console intentionally keeps a hand-rolled head so every weight's job can be explained in an
+          interview.
+        </p>
+      </Reveal>
     </section>
   );
 }

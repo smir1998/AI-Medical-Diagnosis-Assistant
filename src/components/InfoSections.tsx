@@ -229,13 +229,6 @@ export function Evaluation() {
                     encoder's numbers with live-measured ones.
                   </p>
                 )}
-                  <Icon name="layers" className="h-3.5 w-3.5" /> PRODUCTION LINEAGE
-                </p>
-                <p className="mt-2 text-[13px] leading-relaxed text-paper/70">
-                  These bars score the simulated PneumoNet v3 head. A clinical deployment swaps in the
-                  verified Hugging Face models from the <span className="text-mint">Model Registry</span>{" "}
-                  below — same pipeline, real weights.
-                </p>
               </div>
             </div>
           </Reveal>

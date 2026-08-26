@@ -1,5 +1,8 @@
 # Deploys the Vite SPA to GitHub Pages.
 # One-time setup: repo Settings → Pages → Source: "GitHub Actions".
+# NOTE: jekyll-gh-pages.yml in this repo is intentionally inert — this
+# workflow is the ONLY Pages deployer (two deployers fight for the
+# 'pages' environment and Jekyll serves a broken site).
 
 name: Deploy to GitHub Pages
 
@@ -34,6 +37,12 @@ jobs:
 
       - name: Build (--base=./ for Pages sub-path)
         run: npm run build -- --base=./
+
+      - name: Detect competing Pages deployers
+        run: |
+          if [ -f .github/workflows/jekyll-gh-pages.yml ] && grep -q "actions/deploy-pages" .github/workflows/jekyll-gh-pages.yml; then
+            echo "::warning::A second, ACTIVE Pages deployer (jekyll-gh-pages.yml) was found in this tree. It fights deploy.yml for the 'pages' environment and serves a broken site. Restore the inert version shipped by this repo."
+          fi
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

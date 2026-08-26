@@ -4,7 +4,7 @@
 > X-ray CNN, a dermoscopy classifier and a medical NLP desk into one decision-support console.
 
 [![Live on GitHub Pages](https://img.shields.io/badge/LIVE-GitHub%20Pages-0e7c72)](https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/)
-[![QA Bench](https://img.shields.io/badge/QA-29%20cases%20in--browser-16241f)](https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/)
+[![QA Bench](https://img.shields.io/badge/QA-34%20cases%20in--browser-16241f)](https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-a16207.svg)](LICENSE)
 
 ⚠️ **Educational simulation only.** MedLens is a learning tool — its predictions are deterministic
@@ -24,7 +24,7 @@ toy-model outputs, not clinical diagnoses. Never use it as a substitute for prof
 | **Derm Scan** | CLAHE → Otsu ROI → 3-class EfficientNet-style head + ABCDE rule engine | Benign / atypical / melanoma-pattern screening with pixel-statistics heuristic |
 | **NLP Desk** | Keyword-weighted medical Q&A | Answers CNN / normalization / transfer-learning / precision-recall questions |
 | **Report Engine** | Multi-modal report compilation | Printable patient analysis report (Print → PDF), referral recommendations |
-| **QA Bench** | 28-case in-browser regression suite | Tests the live engine: softmax invariants, red-flag rules, determinism, edge cases, registrar validation, vitals flags, CSV export, HF model-registry integrity, semantic-engine math |
+| **QA Bench** | 34-case in-browser regression suite | Tests the live engine: NB posterior invariants, priors/likelihoods from data, red-flag rules, determinism, pixel-head monotonicity, registrar validation, vitals flags, CSV export, HF model-registry integrity, semantic-engine math |
 | **Model Registry** | Verified Hugging Face Hub lineage | Production model for every head (below), linked to live model pages |
 
 ## Model lineage (Hugging Face Hub)
@@ -38,6 +38,19 @@ The console runs deterministic teaching heads; these are the real models a clini
 | Symptom Lab | [`microsoft/BiomedNLP-PubMedBERT`](https://huggingface.co/microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext) | PubMedBERT-base (110M) | 3.1B words of PubMed text |
 | NLP Desk | [`epfl-llm/meditron-7b`](https://huggingface.co/epfl-llm/meditron-7b) | Meditron · Llama-2 (7B) | ≈48B tokens · PubMed + clinical guidelines |
 | Vision foundation | [`microsoft/BiomedCLIP`](https://huggingface.co/microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224) | ViT-B/16 + PubMedBERT (196M) | PMC-15M image–text pairs |
+
+## What actually runs in the browser (the honesty ledger)
+
+| Head | Status | How |
+| --- | --- | --- |
+| Symptom differential | **Real math** | Multinomial Naive Bayes trained at load from an embedded 2,550-row clinical reference table (`src/data/training.ts`) — priors from row counts, Laplace-smoothed likelihoods, posteriors computed per run |
+| Upload X-ray score | **Real pixels** | Lung-band opacity + heterogeneity measured from the actual image on a downscaled canvas → fixed, published logistic head (`src/lib/pixel.ts`) |
+| Derm risk profile | **Real pixels** | Mean / variance / heterogeneity of the lesion crop → 3-class softmax |
+| CC → symptom matcher | **Real weights** | `Xenova/all-MiniLM-L6-v2` ONNX running via Transformers.js with cosine ranking |
+| CNN weights (CXR + skin) | **Documented** | HF Hub lineage above — running them here awaits ONNX exports of the fine-tuned checkpoints |
+| Red-flag rules | **Curated** | Clinical-guideline logic, deterministic and separate from the model |
+
+"Real" = computed from data or measured from your input — still educational, never diagnostic.
 
 ### Running in-browser right now
 

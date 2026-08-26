@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { DURATIONS, SYMPTOMS, SYMPTOM_GROUPS } from "../data/medical";
 import { analyzeSymptoms, prefersReducedMotion, sleep } from "../lib/engine";
 import type { SymptomResult } from "../lib/engine";
+import { NB_ALPHA, NB_MODEL } from "../lib/naiveBayes";
 import { CountUp, Icon } from "./ui";
 import {
   SEMANTIC_MODEL_ID,
@@ -14,9 +15,9 @@ import {
 const RUN_SCRIPT = [
   { stage: 0, line: "▸ encoding symptom vector … 24-dim binary" },
   { stage: 0, line: "▸ duration × severity weighting applied" },
-  { stage: 1, line: "▸ embedding layer → 12 disease prototypes" },
-  { stage: 2, line: "▸ attention over 12 profiles · temp=2.1" },
-  { stage: 3, line: "▸ softmax → posterior probabilities" },
+  { stage: 1, line: "▸ Laplace-smoothed log-likelihoods (α=1)" },
+  { stage: 2, line: "▸ log-priors from 2,550 weighted rows" },
+  { stage: 3, line: "▸ normalize → posterior probabilities" },
   { stage: 3, line: "▸ red-flag rule engine … scanning" },
   { stage: 4, line: "✓ inference complete — compiling report" },
 ];
@@ -477,7 +478,9 @@ export function SymptomChecker({ onComplete, onPipeline, chiefComplaint }: Props
             <h3 className="font-display text-sm font-extrabold uppercase tracking-wide">
               Differential diagnosis <span className="text-inksoft">· run {result.meta.runId}</span>
             </h3>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-teal">softmax · T=2.1</span>
+            <span className="font-mono text-[10px] uppercase tracking-widest text-teal">
+              multinomial NB · α={NB_ALPHA} · trained on {NB_MODEL.rows.toLocaleString()} rows
+            </span>
           </div>
 
           {result.redFlags.length > 0 && (

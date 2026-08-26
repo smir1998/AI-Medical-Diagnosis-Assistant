@@ -64,6 +64,20 @@ jobs:
           fi
           echo "GitHub Pages is enabled (API status ${status}) — deploying."
 
+      - name: Ensure no rival Jekyll Pages workflow exists
+        run: |
+          rival=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/contents/.github/workflows/jekyll-gh-pages.yml?ref=${{ github.sha }}")
+          if [ "$rival" = "200" ]; then
+            echo "::error::A second Pages deployer exists: .github/workflows/jekyll-gh-pages.yml"
+            echo "::error::GitHub Pages serves exactly ONE deployment per push. The Jekyll workflow races this one, takes the slot, and this job fails with 'Creating Pages deployment failed / Not Found'."
+            echo "::error::It also Jekyll-renders a Vite/React project — never correct for this repo. Delete .github/workflows/jekyll-gh-pages.yml, push, and re-run this workflow."
+            exit 1
+          fi
+          echo "No rival Jekyll workflow at this commit — this is the sole Pages deployer."
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

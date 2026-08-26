@@ -110,8 +110,9 @@ First Semantic Engine arm pulls ~23 MB of ONNX weights once (cached afterwards).
 
 One-time: **Settings → Pages → Source: "GitHub Actions"**. Every push to `main` builds with
 `--base=./` and publishes to `https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/`.
-The deploy job verifies via the Pages API that Pages is enabled and fails with actionable
-instructions instead of a raw 404 stack trace.
+The deploy job verifies via the Pages API that Pages is enabled, and refuses to run while a rival
+`jekyll-gh-pages.yml` workflow exists (two deployers can't share the Pages slot — it fails with
+actionable instructions instead of a raw 404 stack trace).
 
 If GitHub reports a branch merge conflict, follow **[MERGE.md](MERGE.md)** — `bash resolve-conflicts.sh`
 keeps the branch content for every conflicting file in one command.

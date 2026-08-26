@@ -24,6 +24,17 @@ export function ReportPanel({ symptom, image, derm, patient }: Props) {
     symptom?.meta.runId ?? image?.runId ?? (derm ? `DS-${derm.time.replace(/:/g, "")}` : "0000")
   )}`;
 
+  const vitalParts = patient
+    ? [
+        patient.vitals.hr !== undefined ? `HR ${patient.vitals.hr} bpm` : "",
+        patient.vitals.sys !== undefined && patient.vitals.dia !== undefined
+          ? `BP ${patient.vitals.sys}/${patient.vitals.dia}`
+          : "",
+        patient.vitals.spo2 !== undefined ? `SpO₂ ${patient.vitals.spo2}%` : "",
+        patient.vitals.temp !== undefined ? `T ${patient.vitals.temp}°C` : "",
+      ].filter(Boolean)
+    : [];
+
   return (
     <section id="report" aria-label="Patient analysis report">
       <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -84,6 +95,17 @@ export function ReportPanel({ symptom, image, derm, patient }: Props) {
               <p>
                 <span className="text-inksoft">ALLERGIES&nbsp;:</span> {patient.allergies}
               </p>
+              {vitalParts.length > 0 && (
+                <p>
+                  <span className="text-inksoft">VITALS&nbsp;&nbsp;&nbsp;&nbsp;:</span> {vitalParts.join(" · ")}
+                </p>
+              )}
+              {patient.flags.length > 0 && (
+                <p className="font-bold text-alert">
+                  <span className="font-normal text-inksoft">FLAGS&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</span>{" "}
+                  ⚠ {patient.flags.join(" · ")}
+                </p>
+              )}
             </>
           ) : (
             <p className="text-inksoft/70">

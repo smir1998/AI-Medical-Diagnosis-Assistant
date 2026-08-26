@@ -44,6 +44,44 @@ const TABS: { id: Tab; label: string; icon: IconName; hint: string }[] = [
   { id: "chat", label: "NLP Desk", icon: "chat", hint: "medical Q&A" },
 ];
 
+/** Normalizes one persisted patient row; drops structurally broken entries. */
+function sanitizePatient(raw: unknown): Patient | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const p = raw as Partial<Patient> & Record<string, unknown>;
+  if (typeof p.id !== "string" || typeof p.name !== "string" || p.name.trim() === "") return null;
+  const triage = [1, 2, 3, 4, 5].includes(Number(p.triage)) ? (Number(p.triage) as Patient["triage"]) : 3;
+  const v = (typeof p.vitals === "object" && p.vitals !== null ? p.vitals : {}) as Record<string, unknown>;
+  const num = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : undefined);
+  return {
+    id: p.id,
+    name: p.name,
+    age: typeof p.age === "number" ? p.age : 0,
+    sex: p.sex === "M" || p.sex === "F" || p.sex === "X" ? p.sex : "X",
+    complaint: typeof p.complaint === "string" ? p.complaint : "—",
+    allergies: typeof p.allergies === "string" ? p.allergies : "NKDA",
+    triage,
+    vitals: { hr: num(v.hr), sys: num(v.sys), dia: num(v.dia), spo2: num(v.spo2), temp: num(v.temp) },
+    flags: Array.isArray(p.flags) ? p.flags.filter((f): f is string => typeof f === "string") : [],
+    status: p.status === "discharged" ? "discharged" : "admitted",
+    admittedAt: typeof p.admittedAt === "string" ? p.admittedAt : new Date().toISOString(),
+  };
+}
+
+/** Normalizes one persisted session-log row. */
+function sanitizeHistory(raw: unknown): HistoryEntry | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const e = raw as Partial<HistoryEntry>;
+  if (typeof e.id !== "number" || typeof e.title !== "string") return null;
+  const type = e.type === "symptom" || e.type === "image" || e.type === "derm" || e.type === "adm" ? e.type : "symptom";
+  return {
+    id: e.id,
+    time: typeof e.time === "string" ? e.time : "--:--:--",
+    type,
+    title: e.title,
+    confidence: typeof e.confidence === "number" && Number.isFinite(e.confidence) ? e.confidence : -1,
+  };
+}
+
 /**
  * Renders the MedLens diagnostic console for patient management, AI-assisted analysis, and educational model information.
  */
@@ -56,8 +94,10 @@ export default function App() {
   const [history, setHistory] = useState<HistoryEntry[]>(() => {
     try {
       const raw = localStorage.getItem("medlens-history");
-      const parsed = raw ? (JSON.parse(raw) as HistoryEntry[]) : [];
-      return Array.isArray(parsed) ? parsed.slice(0, 12) : [];
+      const parsed = raw ? (JSON.parse(raw) as unknown[]) : [];
+      return Array.isArray(parsed)
+        ? parsed.map(sanitizeHistory).filter((e): e is HistoryEntry => e !== null).slice(0, 12)
+        : [];
     } catch {
       return [];
     }
@@ -74,8 +114,10 @@ export default function App() {
   const [patients, setPatients] = useState<Patient[]>(() => {
     try {
       const raw = localStorage.getItem("medlens-patients");
-      const parsed = raw ? (JSON.parse(raw) as Patient[]) : [];
-      return Array.isArray(parsed) ? parsed.slice(0, 30) : [];
+      const parsed = raw ? (JSON.parse(raw) as unknown[]) : [];
+      return Array.isArray(parsed)
+        ? parsed.map(sanitizePatient).filter((p): p is Patient => p !== null).slice(0, 30)
+        : [];
     } catch {
       return [];
     }

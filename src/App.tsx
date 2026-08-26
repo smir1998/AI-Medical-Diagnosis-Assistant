@@ -346,6 +346,7 @@ export default function App() {
       <InsideModel />
       <Evaluation />
       <TrainingGrounds onTrained={setTrainedModel} />
+      <Evaluation />
       <ModelRegistry />
       <FieldNotes />
 

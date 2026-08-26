@@ -229,6 +229,13 @@ export function Evaluation() {
                     encoder's numbers with live-measured ones.
                   </p>
                 )}
+                  <Icon name="layers" className="h-3.5 w-3.5" /> PRODUCTION LINEAGE
+                </p>
+                <p className="mt-2 text-[13px] leading-relaxed text-paper/70">
+                  These bars score the simulated PneumoNet v3 head. A clinical deployment swaps in the
+                  verified Hugging Face models from the <span className="text-mint">Model Registry</span>{" "}
+                  below — same pipeline, real weights.
+                </p>
               </div>
             </div>
           </Reveal>
@@ -327,33 +334,12 @@ export function ModelRegistry() {
         ))}
       </div>
 
-      <Reveal delay={100}>
-        <div className="dark-grid mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-2 border-pine px-4 py-3 text-paper">
-          <span className="inline-flex items-center gap-2 font-mono text-[10px] font-bold tracking-[0.22em] text-mint">
-            <span className="dot-live h-1.5 w-1.5 rounded-full bg-mint" /> RUNNING IN THIS BROWSER · REAL WEIGHTS
-          </span>
-          <span className="font-mono text-[11px] leading-relaxed text-paper/80">
-            <strong className="text-mint">Xenova/all-MiniLM-L6-v2</strong> — ONNX q8 · 22.7 MB · Transformers.js ·
-            384-dim sentence embeddings. Powers the Symptom Lab's semantic CC matcher (cosine rank over
-            the 24-symptom index). Cached after first pull; nothing is sent to a server.
-          </span>
-          <a
-            href="https://huggingface.co/Xenova/all-MiniLM-L6-v2"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="ml-auto shrink-0 border border-mint/40 px-2 py-1 font-mono text-[9px] font-bold tracking-[0.18em] text-mint transition-colors hover:bg-mint hover:text-pine"
-          >
-            MODEL CARD ↗
-          </a>
-        </div>
-      </Reveal>
-
-      <Reveal delay={140}>
-        <p className="mt-4 flex items-start gap-2 border-l-2 border-amber pl-3 font-mono text-[11px] leading-relaxed text-inksoft">
+      <Reveal delay={120}>
+        <p className="mt-6 flex items-start gap-2 border-l-2 border-amber pl-3 font-mono text-[11px] leading-relaxed text-inksoft">
           <Icon name="warn" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber" />
-          The four clinical heads above need ONNX exports of their fine-tuned checkpoints (or a FastAPI
-          server) before they can run client-side — until then the console keeps deterministic teaching
-          heads so every weight's job stays interview-explainable.
+          Loading these in-browser is possible via Transformers.js for a graduation project — the
+          console intentionally keeps a hand-rolled head so every weight's job can be explained in an
+          interview.
         </p>
       </Reveal>
     </section>
@@ -363,6 +349,7 @@ export function ModelRegistry() {
 /**
  * Presents expandable medical-AI interview questions alongside a toy symptom dataset table.
  */
+/* ---------- field notes: FAQ + dataset ---------- */
 
 export function FieldNotes() {
   const [open, setOpen] = useState<number | null>(0);

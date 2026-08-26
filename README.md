@@ -108,6 +108,9 @@ First Semantic Engine arm pulls ~23 MB of ONNX weights once (cached afterwards).
 One-time: **Settings → Pages → Source: "GitHub Actions"**. Every push to `main` builds with
 `--base=./` and publishes to `https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/`.
 
+If GitHub reports a branch merge conflict, follow **[MERGE.md](MERGE.md)** — `bash resolve-conflicts.sh`
+keeps the branch content for every conflicting file in one command.
+
 ## Project structure
 
 ```

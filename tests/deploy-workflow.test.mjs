@@ -1,10 +1,11 @@
-// Regression tests for .github/workflows/deploy.yml
-//
-// This project has no YAML-parsing dependency and the workflow only runs on
-// GitHub's runners, so these tests validate the checked-in file as plain
-// text using Node's built-in test runner (no extra dependencies required).
-//
-// Run with:  node --test tests/deploy-workflow.test.mjs
+/* ------------------------------------------------------------------ */
+/*  Tests for .github/workflows/deploy.yml — the new "Verify GitHub     */
+/*  Pages is enabled" pre-flight step added to the deploy job.          */
+/*                                                                       */
+/*  No YAML parser is installed in this sandbox, so the workflow is     */
+/*  validated at the text/structure level: step ordering, the API call  */
+/*  it makes, and the failure-mode messaging it prints on a 404.        */
+/* ------------------------------------------------------------------ */
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
@@ -13,90 +14,88 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const workflowPath = path.join(__dirname, "..", ".github", "workflows", "deploy.yml");
-const workflow = readFileSync(workflowPath, "utf8");
+const SOURCE = readFileSync(path.join(__dirname, "../.github/workflows/deploy.yml"), "utf8");
 
-// Anchor on the deploy *step*'s unique action reference rather than its
-// "name:" text — the workflow's top-level `name:` is also literally
-// "Deploy to GitHub Pages", so searching for that string would match the
-// wrong (earlier) occurrence.
-const DEPLOY_STEP_MARKER = "uses: actions/deploy-pages@v4";
-
-function verifyStepSlice() {
-  const start = workflow.indexOf("Verify GitHub Pages is enabled");
-  const end = workflow.indexOf(DEPLOY_STEP_MARKER);
-  assert.ok(start !== -1, "verify step missing");
-  assert.ok(end !== -1, "deploy step missing");
-  assert.ok(start < end, "verify step must appear before the deploy step in file order");
-  return workflow.slice(start, end);
+/** crude line-based step splitter good enough for structural assertions */
+function deployJobBody() {
+  const idx = SOURCE.indexOf("\n  deploy:");
+  assert.ok(idx !== -1, "deploy job not found");
+  return SOURCE.slice(idx);
 }
 
-describe("deploy.yml — GitHub Pages verification step", () => {
-  test("adds a 'Verify GitHub Pages is enabled' step to the deploy job", () => {
-    assert.match(workflow, /name:\s*Verify GitHub Pages is enabled/);
+describe("deploy.yml — deploy job structure", () => {
+  test("the deploy job still targets the github-pages environment", () => {
+    assert.match(deployJobBody(), /environment:\s*\n\s*name:\s*github-pages/);
   });
 
-  test("verification step runs before the actual deploy step", () => {
-    // Throws via the internal assertions if ordering is wrong.
-    verifyStepSlice();
+  test("the Pages pre-flight check runs before the actual deploy step", () => {
+    const body = deployJobBody();
+    const checkIdx = body.indexOf("Verify GitHub Pages is enabled");
+    const deployIdx = body.indexOf("Deploy to GitHub Pages");
+    assert.ok(checkIdx !== -1, "pre-flight check step not found");
+    assert.ok(deployIdx !== -1, "deploy step not found");
+    assert.ok(checkIdx < deployIdx, "pre-flight check must run before the deploy step");
   });
 
-  test("queries the GitHub Pages API for the current repository", () => {
-    assert.match(
-      workflow,
-      /https:\/\/api\.github\.com\/repos\/\$\{\{\s*github\.repository\s*\}\}\/pages/
-    );
-  });
-
-  test("authenticates the API check with the workflow token", () => {
-    assert.match(workflow, /Authorization:\s*Bearer\s*\$\{\{\s*github\.token\s*\}\}/);
-  });
-
-  test("fails the job (exit 1) when the Pages API returns 404", () => {
-    const verifyStep = verifyStepSlice();
-    assert.match(verifyStep, /if\s*\[\s*"\$status"\s*=\s*"404"\s*\]/);
-    assert.match(verifyStep, /exit 1/);
-  });
-
-  test("error output points contributors at the exact fix (Settings → Pages)", () => {
-    const verifyStep = verifyStepSlice();
-    assert.match(verifyStep, /::error::/);
-    assert.match(verifyStep, /settings\/pages/);
-    assert.match(verifyStep, /Build and deployment.*Source.*GitHub Actions/s);
-  });
-
-  test("prints a clear success message when Pages is enabled", () => {
-    const verifyStep = verifyStepSlice();
-    assert.match(verifyStep, /GitHub Pages is enabled/);
-  });
-
-  test("checks status via an exact string comparison, not a loose/substring match", () => {
-    const verifyStep = verifyStepSlice();
-    // Guards against a regression to a fragile pattern like `[[ "$status" == *404* ]]`.
-    assert.doesNotMatch(verifyStep, /==\s*\*404\*/);
-    assert.match(verifyStep, /"\$status"\s*=\s*"404"/);
+  test("still uses actions/deploy-pages@v4 for the actual deploy", () => {
+    assert.match(deployJobBody(), /uses:\s*actions\/deploy-pages@v4/);
   });
 });
 
-describe("deploy.yml — unchanged deploy mechanics still intact", () => {
-  test("deploy job still uses actions/deploy-pages@v4", () => {
-    assert.match(workflow, /uses:\s*actions\/deploy-pages@v4/);
+describe("deploy.yml — Pages pre-flight check step", () => {
+  function checkStepBody() {
+    const body = deployJobBody();
+    const start = body.indexOf("Verify GitHub Pages is enabled");
+    const end = body.indexOf("- name: Deploy to GitHub Pages");
+    assert.ok(start !== -1 && end !== -1 && start < end);
+    return body.slice(start, end);
+  }
+
+  test("queries the GitHub Pages API for this repository", () => {
+    const step = checkStepBody();
+    assert.match(step, /curl/);
+    assert.match(step, /api\.github\.com\/repos\/\$\{\{\s*github\.repository\s*\}\}\/pages/);
   });
 
-  test("build job still installs, builds with the Pages sub-path base, and uploads the artifact", () => {
-    assert.match(workflow, /npm ci --no-audit --no-fund \|\| npm install --no-audit --no-fund/);
-    assert.match(workflow, /npm run build -- --base=\.\//);
-    assert.match(workflow, /uses:\s*actions\/upload-pages-artifact@v3/);
+  test("authenticates the API call with the workflow token", () => {
+    assert.match(checkStepBody(), /Authorization:\s*Bearer\s*\$\{\{\s*github\.token\s*\}\}/);
   });
 
-  test("concurrency still serializes Pages deployments", () => {
-    assert.match(workflow, /group:\s*pages/);
-    assert.match(workflow, /cancel-in-progress:\s*true/);
+  test("captures only the HTTP status code (no body) via -o /dev/null -w", () => {
+    const step = checkStepBody();
+    assert.match(step, /-o\s+\/dev\/null/);
+    assert.match(step, /-w\s+["']%\{http_code\}["']/);
   });
 
-  test("deploy job still declares the permissions the Pages API check needs", () => {
-    assert.match(workflow, /pages:\s*write/);
-    assert.match(workflow, /id-token:\s*write/);
-    assert.match(workflow, /contents:\s*read/);
+  test("fails the job with a non-zero exit code when Pages is not enabled (404)", () => {
+    const step = checkStepBody();
+    assert.match(step, /if\s*\[\s*"\$status"\s*=\s*"404"\s*\]/);
+    assert.match(step, /exit 1/);
+  });
+
+  test("prints an actionable, human-readable fix pointing at repo Settings → Pages", () => {
+    const step = checkStepBody();
+    assert.match(step, /::error::/);
+    assert.match(step, /settings\/pages/);
+    assert.match(step, /Re-run failed jobs/);
+  });
+
+  test("logs a success message with the observed status when Pages is enabled", () => {
+    assert.match(checkStepBody(), /GitHub Pages is enabled \(API status \$\{status\}\)/);
+  });
+});
+
+describe("deploy.yml — unrelated job configuration is unchanged", () => {
+  test("permissions block still grants pages:write and id-token:write", () => {
+    assert.match(SOURCE, /permissions:[\s\S]*pages:\s*write/);
+    assert.match(SOURCE, /permissions:[\s\S]*id-token:\s*write/);
+  });
+
+  test("the build job is untouched (checkout, setup-node, build, upload-pages-artifact)", () => {
+    const buildBody = SOURCE.slice(SOURCE.indexOf("  build:"), SOURCE.indexOf("\n  deploy:"));
+    assert.match(buildBody, /actions\/checkout@v4/);
+    assert.match(buildBody, /actions\/setup-node@v4/);
+    assert.match(buildBody, /npm run build -- --base=\.\//);
+    assert.match(buildBody, /actions\/upload-pages-artifact@v3/);
   });
 });

@@ -23,16 +23,26 @@ emergency number.
 
 | Module | Technique | What it does |
 | --- | --- | --- |
-| **Registrar** | On-device admission log (localStorage) | Intake form (name, age, sex, chief complaint, allergies, CTAS triage 1–5, HR/BP/SpO₂/temp vitals), auto-issued MRNs, clinical flag engine (hypoxia, tachycardia, febrile…), CSV export, chart/discharge workflow — the active patient stamps every report |
-| **Symptom Lab** | Multinomial Naive Bayes + one-hot vector UI | 24-dim symptom vector with live cell animation, scenario presets, softmax differential over 12 profiles, ICD-10 codes, severity tiers, red-flag rules |
-| **Training Grounds** | **Live SGD training in your browser** | Trains a multinomial logistic head on real disease–symptom associations (Kaggle), draws the loss curve epoch-by-epoch, and reports **measured** accuracy/precision/recall/F1 on a held-out split |
-| **Semantic Engine** | `Xenova/all-MiniLM-L6-v2` via Transformers.js | Real ONNX transformer inference: free-text chief complaint → cosine-ranked symptom vector, lazy-loaded (~23 MB q8 weights, cached) |
-| **Radiology Lab** | Simulated CNN + real pixel-statistics head | Upload or load bundled synthetic teaching studies; decode → resize 224 → ÷255 → Conv/Pool trace → softmax; Grad-CAM-style hotspot; honest "synthetic" labeling |
-| **Derm Scan** | CLAHE → Otsu ROI → 3-class head + ABCDE engine | Benign / atypical / melanoma-pattern screening with ABCDE rule flags |
-| **NLP Desk** | Keyword-weighted medical Q&A | CNNs, normalization, transfer learning, precision/recall, HF lineage, triage guidance |
-| **Model Registry** | Verified Hugging Face lineage | Real production model per head, linked to live model pages (table below) |
-| **Report Engine** | Multi-modal report compilation | Printable patient analysis report (Print → PDF), vitals, flags, referral recommendations |
-| **QA Bench** | 41-case in-browser regression suite | Tests the live engine across 11 suites — convergence, measured accuracy, determinism, invariants, edge cases (table below) |
+| **Registrar** | On-device admission log (localStorage) | Intake form (name, age, sex, chief complaint, allergies, CTAS triage 1–5, HR/BP/SpO₂/temp vitals), auto-issued MRNs, clinical flag engine (hypoxia, tachycardia, febrile…), CSV export, chart/discharge workflow — the active patient is stamped onto every report and its CC pre-fills the symptom vector |
+| **Symptom Lab** | NLP-encoded feature vector → softmax over 12 disease profiles | Differential diagnosis with confidence, ICD-10 codes, severity tiers, red-flag rules |
+| **Radiology Lab** | Simulated CNN (Conv→Pool→Dense→softmax) with Grad-CAM-style hotspot | Pneumonia vs Normal classification on uploaded or sample chest X-rays |
+| **Derm Scan** | CLAHE → Otsu ROI → 3-class EfficientNet-style head + ABCDE rule engine | Benign / atypical / melanoma-pattern screening with pixel-statistics heuristic |
+| **NLP Desk** | Keyword-weighted medical Q&A | Answers CNN / normalization / transfer-learning / precision-recall questions |
+| **Report Engine** | Multi-modal report compilation | Printable patient analysis report (Print → PDF), referral recommendations |
+| **QA Bench** | 26-case in-browser regression suite | Tests the live engine: softmax invariants, red-flag rules, determinism, edge cases, registrar validation, vitals flags, CSV export, HF model-registry integrity |
+| **Model Registry** | Verified Hugging Face Hub lineage | Production model for every head (below), linked to live model pages |
+
+## Model lineage (Hugging Face Hub)
+
+The console runs deterministic teaching heads; these are the real models a clinical deployment would load:
+
+| Console head | HF model | Architecture | Trained on |
+| --- | --- | --- | --- |
+| Radiology Lab | [`keremberke/resnet-50-chest-xray-classification`](https://huggingface.co/keremberke/resnet-50-chest-xray-classification) | ResNet-50 (25.6M) | Kaggle Chest X-Ray · 5,824 radiographs |
+| Derm Scan | [`syaha/skin_cancer_detection_model`](https://huggingface.co/syaha/skin_cancer_detection_model) | CNN · HAM10000 fine-tuned | HAM10000 · 10,015 dermoscopy lesions, 7 classes |
+| Symptom Lab | [`microsoft/BiomedNLP-PubMedBERT`](https://huggingface.co/microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext) | PubMedBERT-base (110M) | 3.1B words of PubMed text |
+| NLP Desk | [`epfl-llm/meditron-7b`](https://huggingface.co/epfl-llm/meditron-7b) | Meditron · Llama-2 (7B) | ≈48B tokens · PubMed + clinical guidelines |
+| Vision foundation | [`microsoft/BiomedCLIP`](https://huggingface.co/microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224) | ViT-B/16 + PubMedBERT (196M) | PMC-15M image–text pairs |
 
 ## System architecture
 

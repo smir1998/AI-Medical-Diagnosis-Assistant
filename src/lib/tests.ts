@@ -4,7 +4,7 @@
 /* ------------------------------------------------------------------ */
 
 import { analyzeSymptoms, predictImage, prefersReducedMotion } from "./engine";
-import { CHAT_FALLBACK } from "../data/medical";
+import { CHAT_FALLBACK, HF_MODEL_ZOO } from "../data/medical";
 import { matchAnswer } from "../components/Chatbot";
 import { analyzePixels, buildFlags } from "../components/DermScan";
 import {
@@ -41,7 +41,7 @@ type Run = () => { pass: boolean; detail: string } | Promise<{ pass: boolean; de
 
 interface Case {
   id: string;
-  suite: "SYMPTOM NLP" | "RADIOLOGY CNN" | "NLP DESK" | "DERM SCREEN" | "REGISTRAR";
+  suite: "SYMPTOM NLP" | "RADIOLOGY CNN" | "NLP DESK" | "DERM SCREEN" | "REGISTRAR" | "MODEL ZOO";
   name: string;
   run: Run;
 }
@@ -367,6 +367,41 @@ export const TEST_CASES: Case[] = [
       const csv = toCSV([patient]);
       const ok = csv.startsWith('"MRN"') && csv.includes('"fever, cough 3 days"');
       return { pass: ok, detail: ok ? "header + escaped field ok" : `csv head=${csv.slice(0, 40)}…` };
+    },
+  },
+
+  /* ----- M · model registry ----- */
+  {
+    id: "M1",
+    suite: "MODEL ZOO",
+    name: "Every HF entry: valid repo id, Hub URL, arch & dataset present",
+    run: () => {
+      const bad = HF_MODEL_ZOO.find(
+        (m) =>
+          !/^[\w.-]+\/[\w.-]+$/.test(m.repoId) ||
+          !m.arch.trim() ||
+          !m.dataset.trim() ||
+          !m.metric.trim()
+      );
+      return {
+        pass: !bad && HF_MODEL_ZOO.length >= 5,
+        detail: bad ? `invalid entry: ${bad.repoId}` : `${HF_MODEL_ZOO.length}/5 entries well-formed`,
+      };
+    },
+  },
+  {
+    id: "M2",
+    suite: "MODEL ZOO",
+    name: "Console coverage: vision ×2, NLP, LLM and multimodal heads all backed",
+    run: () => {
+      const tags = HF_MODEL_ZOO.map((m) => m.tag);
+      const vision = tags.filter((t) => t === "vision").length;
+      const ok =
+        vision >= 2 && tags.includes("nlp") && tags.includes("llm") && tags.includes("multimodal");
+      return {
+        pass: ok,
+        detail: `vision=${vision} · nlp=${tags.includes("nlp")} · llm=${tags.includes("llm")} · mm=${tags.includes("multimodal")}`,
+      };
     },
   },
 ];

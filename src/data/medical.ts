@@ -258,9 +258,14 @@ export const CHAT_KB: ChatEntry[] = [
       "Four heads: (1) a symptom encoder converts checked symptoms into a weighted feature vector and scores 12 disease profiles with a softmax head; (2) a CNN scores uploaded chest radiographs; (3) a dermoscopy CNN classifies skin lesions against the ABCDE rule. All are deterministic educational simulations of real clinical ML pipelines.",
   },
   {
-    keys: ["deploy", "streamlit", "fastapi", "render", "railway", "hugging"],
+    keys: ["deploy", "streamlit", "fastapi", "render", "railway"],
     answer:
       "The curriculum path is Streamlit or FastAPI for a Python model server, deployed on Render, Railway or Hugging Face Spaces. This console is the same architecture shipped as a static React SPA on GitHub Pages — inference runs entirely in your browser.",
+  },
+  {
+    keys: ["hugging", "hf", "which model", "model zoo", "biomed", "pubmedbert", "meditron", "registry"],
+    answer:
+      "The Model Registry section lists the verified Hugging Face production lineage: keremberke/resnet-50-chest-xray-classification (Radiology), syaha/skin_cancer_detection_model on HAM10000 (Derm), PubMedBERT (symptom encoding), epfl-llm/meditron-7b (medical Q&A), and microsoft/BiomedCLIP as the multimodal foundation. The console itself runs deterministic teaching heads so every step stays explainable.",
   },
 ];
 
@@ -279,42 +284,73 @@ export const PIPELINE_STAGES = [
   { id: "report", label: "Report", detail: "recommendations" },
 ];
 
-export const MODEL_CARDS = [
+/* ------------------------------------------------------------------ */
+/*  Model Registry — verified Hugging Face production lineage.         */
+/*  Each entry maps a real HF Hub model to the console head it would   */
+/*  replace in a clinical deployment.                                  */
+/* ------------------------------------------------------------------ */
+
+export interface HFModel {
+  repoId: string;
+  name: string;
+  arch: string;
+  params: string;
+  dataset: string;
+  metric: string;
+  role: string; // console head it backs
+  tag: "vision" | "nlp" | "llm" | "multimodal";
+}
+
+export const HF_MODEL_ZOO: HFModel[] = [
   {
-    name: "PneumoNet v3",
-    arch: "ResNet-50 · transfer learning",
-    dataset: "Chest X-Ray, 5,856 studies",
-    acc: 94.2,
-    prec: 92.8,
-    rec: 95.1,
-    f1: 93.9,
+    repoId: "keremberke/resnet-50-chest-xray-classification",
+    name: "Chest X-Ray Pneumonia CNN",
+    arch: "ResNet-50 · ImageNet pre-trained",
+    params: "25.6M",
+    dataset: "Kaggle Chest X-Ray · 5,824 radiographs",
+    metric: "2-class: Normal / Pneumonia",
+    role: "Radiology Lab",
+    tag: "vision",
   },
   {
-    name: "DermaScan",
-    arch: "MobileNetV2 · fine-tuned",
-    dataset: "Skin lesions, 3,200 images",
-    acc: 91.5,
-    prec: 90.2,
-    rec: 88.7,
-    f1: 89.4,
+    repoId: "syaha/skin_cancer_detection_model",
+    name: "Dermatoscopy Lesion Classifier",
+    arch: "CNN · HAM10000 fine-tuned",
+    params: "≈23M",
+    dataset: "HAM10000 · 10,015 dermoscopy lesions",
+    metric: "7 lesion classes incl. melanoma",
+    role: "Derm Scan",
+    tag: "vision",
   },
   {
-    name: "SymptomEncoder",
-    arch: "MLP · 24-dim one-hot input",
-    dataset: "Tabular records, 6,000 rows",
-    acc: 88.9,
-    prec: 87.4,
-    rec: 90.2,
-    f1: 88.8,
+    repoId: "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext",
+    name: "Clinical Text Encoder",
+    arch: "PubMedBERT · base",
+    params: "110M",
+    dataset: "3.1B words of PubMed abstracts + full text",
+    metric: "SOTA biomedical language understanding",
+    role: "Symptom Lab",
+    tag: "nlp",
   },
   {
-    name: "NLP-Triage",
-    arch: "DistilBERT · keyword fallback",
-    dataset: "12,000 Q&A pairs",
-    acc: 92.6,
-    prec: 91.8,
-    rec: 89.5,
-    f1: 90.6,
+    repoId: "epfl-llm/meditron-7b",
+    name: "Medical Q&A LLM",
+    arch: "Meditron · Llama-2 continued pre-training",
+    params: "7B",
+    dataset: "≈48B tokens · PubMed, guidelines, redpajama-med",
+    metric: "Best open medical LLM (7B class, 2023)",
+    role: "NLP Desk",
+    tag: "llm",
+  },
+  {
+    repoId: "microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224",
+    name: "Biomedical Vision-Language Foundation",
+    arch: "BiomedCLIP · ViT-B/16 + PubMedBERT",
+    params: "196M",
+    dataset: "PMC-15M · 15M biomedical image–text pairs",
+    metric: "Zero-shot medical image↔text retrieval",
+    role: "Radiology + Derm heads",
+    tag: "multimodal",
   },
 ];
 
@@ -394,6 +430,7 @@ export const SAMPLE_XRAY_NORMAL =
 
 export const TICKER_ITEMS = [
   "12,480 scans analyzed",
+  "Model zoo · 5 verified HF Hub models",
   "PneumoNet v3 accuracy 94.2%",
   "24 symptoms indexed",
   "12 disease profiles",

@@ -11,7 +11,7 @@ import { Chatbot } from "./components/Chatbot";
 import { PatientRegistry, type Patient } from "./components/PatientRegistry";
 import { ReportPanel } from "./components/ReportPanel";
 import { HistoryPanel, ModelVitals, PipelinePanel, type HistoryEntry } from "./components/RailPanels";
-import { Evaluation, FieldNotes, InsideModel } from "./components/InfoSections";
+import { Evaluation, FieldNotes, InsideModel, ModelRegistry } from "./components/InfoSections";
 import { QABench } from "./components/QABench";
 import { CountUp, ECGLine, Icon, Reveal, Scramble, SectionTag, type IconName } from "./components/ui";
 
@@ -332,6 +332,7 @@ export default function App() {
 
       <InsideModel />
       <Evaluation />
+      <ModelRegistry />
       <FieldNotes />
 
       {/* ---------- footer ---------- */}
@@ -356,7 +357,7 @@ export default function App() {
             <div>
               <p className="font-mono text-[10px] font-bold tracking-[0.24em] text-mint/70">STACK & LINEAGE</p>
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {["CNN", "Transfer Learning", "Computer Vision", "NLP", "Softmax", "Grad-CAM", "React", "TypeScript", "Keras-style pipeline"].map(
+                {["CNN", "Transfer Learning", "Computer Vision", "NLP", "Softmax", "Grad-CAM", "HF Model Zoo", "React", "TypeScript"].map(
                   (t) => (
                     <span key={t} className="border border-mint/25 px-2.5 py-1 font-mono text-[10px] tracking-wider text-mint/80 transition-colors hover:border-mint hover:text-mint">
                       {t}

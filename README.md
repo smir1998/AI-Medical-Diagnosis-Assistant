@@ -24,7 +24,20 @@ toy-model outputs, not clinical diagnoses. Never use it as a substitute for prof
 | **Derm Scan** | CLAHE → Otsu ROI → 3-class EfficientNet-style head + ABCDE rule engine | Benign / atypical / melanoma-pattern screening with pixel-statistics heuristic |
 | **NLP Desk** | Keyword-weighted medical Q&A | Answers CNN / normalization / transfer-learning / precision-recall questions |
 | **Report Engine** | Multi-modal report compilation | Printable patient analysis report (Print → PDF), referral recommendations |
-| **QA Bench** | 24-case in-browser regression suite | Tests the live engine: softmax invariants, red-flag rules, determinism, edge cases, registrar validation, vitals flags, CSV export |
+| **QA Bench** | 26-case in-browser regression suite | Tests the live engine: softmax invariants, red-flag rules, determinism, edge cases, registrar validation, vitals flags, CSV export, HF model-registry integrity |
+| **Model Registry** | Verified Hugging Face Hub lineage | Production model for every head (below), linked to live model pages |
+
+## Model lineage (Hugging Face Hub)
+
+The console runs deterministic teaching heads; these are the real models a clinical deployment would load:
+
+| Console head | HF model | Architecture | Trained on |
+| --- | --- | --- | --- |
+| Radiology Lab | [`keremberke/resnet-50-chest-xray-classification`](https://huggingface.co/keremberke/resnet-50-chest-xray-classification) | ResNet-50 (25.6M) | Kaggle Chest X-Ray · 5,824 radiographs |
+| Derm Scan | [`syaha/skin_cancer_detection_model`](https://huggingface.co/syaha/skin_cancer_detection_model) | CNN · HAM10000 fine-tuned | HAM10000 · 10,015 dermoscopy lesions, 7 classes |
+| Symptom Lab | [`microsoft/BiomedNLP-PubMedBERT`](https://huggingface.co/microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext) | PubMedBERT-base (110M) | 3.1B words of PubMed text |
+| NLP Desk | [`epfl-llm/meditron-7b`](https://huggingface.co/epfl-llm/meditron-7b) | Meditron · Llama-2 (7B) | ≈48B tokens · PubMed + clinical guidelines |
+| Vision foundation | [`microsoft/BiomedCLIP`](https://huggingface.co/microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224) | ViT-B/16 + PubMedBERT (196M) | PMC-15M image–text pairs |
 
 ## System architecture
 

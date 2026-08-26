@@ -1,5 +1,8 @@
 # Deploys the Vite SPA to GitHub Pages.
 # One-time setup: repo Settings → Pages → Source: "GitHub Actions".
+# NOTE: jekyll-gh-pages.yml in this repo is intentionally inert — this
+# workflow is the ONLY Pages deployer (two deployers fight for the
+# 'pages' environment and Jekyll serves a broken site).
 
 name: Deploy to GitHub Pages
 
@@ -35,6 +38,12 @@ jobs:
       - name: Build (--base=./ for Pages sub-path)
         run: npm run build -- --base=./
 
+      - name: Detect competing Pages deployers
+        run: |
+          if [ -f .github/workflows/jekyll-gh-pages.yml ] && grep -q "actions/deploy-pages" .github/workflows/jekyll-gh-pages.yml; then
+            echo "::warning::A second, ACTIVE Pages deployer (jekyll-gh-pages.yml) was found in this tree. It fights deploy.yml for the 'pages' environment and serves a broken site. Restore the inert version shipped by this repo."
+          fi
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -63,20 +72,6 @@ jobs:
             exit 1
           fi
           echo "GitHub Pages is enabled (API status ${status}) — deploying."
-
-      - name: Ensure no rival Jekyll Pages workflow exists
-        run: |
-          rival=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: Bearer ${{ github.token }}" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/contents/.github/workflows/jekyll-gh-pages.yml?ref=${{ github.sha }}")
-          if [ "$rival" = "200" ]; then
-            echo "::error::A second Pages deployer exists: .github/workflows/jekyll-gh-pages.yml"
-            echo "::error::GitHub Pages serves exactly ONE deployment per push. The Jekyll workflow races this one, takes the slot, and this job fails with 'Creating Pages deployment failed / Not Found'."
-            echo "::error::It also Jekyll-renders a Vite/React project — never correct for this repo. Delete .github/workflows/jekyll-gh-pages.yml, push, and re-run this workflow."
-            exit 1
-          fi
-          echo "No rival Jekyll workflow at this commit — this is the sole Pages deployer."
 
       - name: Deploy to GitHub Pages
         id: deployment

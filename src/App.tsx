@@ -11,7 +11,7 @@ import { Chatbot } from "./components/Chatbot";
 import { PatientRegistry, type Patient } from "./components/PatientRegistry";
 import { ReportPanel } from "./components/ReportPanel";
 import { HistoryPanel, ModelVitals, PipelinePanel, type HistoryEntry } from "./components/RailPanels";
-import { Evaluation, FieldNotes, InsideModel, ModelRegistry } from "./components/InfoSections";
+import { Evaluation, FieldNotes, InsideModel, ModelRegistry, setLiveMetrics } from "./components/InfoSections";
 import { TrainingGrounds } from "./components/TrainingGrounds";
 import type { TrainedModel } from "./lib/train";
 import { QABench } from "./components/QABench";
@@ -46,6 +46,11 @@ export default function App() {
   });
   const [qaOpen, setQaOpen] = useState(false);
   const [trainedModel, setTrainedModel] = useState<TrainedModel | null>(null);
+
+  /* feed measured metrics to the Evaluation panel's store */
+  useEffect(() => {
+    setLiveMetrics(trainedModel?.metrics ?? null);
+  }, [trainedModel]);
 
   /* ---------- patient registry (persisted) ---------- */
   const [patients, setPatients] = useState<Patient[]>(() => {
@@ -200,7 +205,9 @@ export default function App() {
                   { k: "Scans analyzed", v: 12480, d: 0 },
                   { k: "Symptom dims", v: 24, d: 0 },
                   { k: "Disease profiles", v: 12, d: 0 },
-                  { k: "Top-model acc.", v: 94.2, d: 1, suffix: "%" },
+                  trainedModel
+                    ? { k: "Trained head · measured", v: trainedModel.metrics.accuracy * 100, d: 1, suffix: "%" }
+                    : { k: "Top-model acc.", v: 94.2, d: 1, suffix: "%" },
                 ].map((s) => (
                   <div key={s.k} className="-ml-px -mt-px border border-ink/15 px-5 py-4">
                     <dt className="font-mono text-[9px] tracking-[0.18em] text-inksoft uppercase">{s.k}</dt>
@@ -337,7 +344,7 @@ export default function App() {
       <ECGLine className="block h-12 w-full text-teal/70" slow />
 
       <InsideModel />
-      <Evaluation liveMetrics={trainedModel?.metrics ?? null} />
+      <Evaluation />
       <TrainingGrounds onTrained={setTrainedModel} />
       <ModelRegistry />
       <FieldNotes />
@@ -364,7 +371,7 @@ export default function App() {
             <div>
               <p className="font-mono text-[10px] font-bold tracking-[0.24em] text-mint/70">STACK & LINEAGE</p>
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {["CNN", "Transfer Learning", "Computer Vision", "NLP", "Softmax", "Grad-CAM", "HF Model Zoo", "Transformers.js", "ONNX Runtime"].map(
+                {["CNN", "Transfer Learning", "Computer Vision", "NLP", "Softmax", "Grad-CAM", "HF Model Zoo", "Transformers.js", "ONNX Runtime", "React", "TypeScript"].map(
                   (t) => (
                     <span key={t} className="border border-mint/25 px-2.5 py-1 font-mono text-[10px] tracking-wider text-mint/80 transition-colors hover:border-mint hover:text-mint">
                       {t}

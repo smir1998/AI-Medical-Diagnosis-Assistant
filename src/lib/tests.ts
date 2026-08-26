@@ -4,7 +4,12 @@
 /* ------------------------------------------------------------------ */
 
 import { analyzeSymptoms, predictImage, prefersReducedMotion } from "./engine";
-import { CHAT_FALLBACK, HF_MODEL_ZOO } from "../data/medical";
+import { cosineSim } from "./semantic";
+import { predictWithModel, trainModel } from "./train";
+import { NB_MODEL, nbPosteriors } from "./naiveBayes";
+import { opacityToPneumonia, radiographStats } from "./pixel";
+import { TRAINING_ROWS } from "../data/training";
+import { CHAT_FALLBACK, HF_MODEL_ZOO, SAMPLE_XRAY_NORMAL, SAMPLE_XRAY_PNEUMONIA } from "../data/medical";
 import { matchAnswer } from "../components/Chatbot";
 import { analyzePixels, buildFlags } from "../components/DermScan";
 import {
@@ -41,7 +46,18 @@ type Run = () => { pass: boolean; detail: string } | Promise<{ pass: boolean; de
 
 interface Case {
   id: string;
-  suite: "SYMPTOM NLP" | "RADIOLOGY CNN" | "NLP DESK" | "DERM SCREEN" | "REGISTRAR" | "MODEL ZOO";
+  suite:
+    | "SYMPTOM NLP"
+    | "RADIOLOGY CNN"
+    | "NLP DESK"
+    | "DERM SCREEN"
+    | "REGISTRAR"
+    | "MODEL ZOO"
+    | "SEMANTIC UTILS"
+    | "PIXEL HEAD"
+    | "TRAINED MODEL"
+    | "BUNDLE"
+    | "LIVE TRAINER";
   name: string;
   run: Run;
 }
@@ -51,13 +67,16 @@ interface Case {
 const near = (a: number, b: number, eps: number) => Math.abs(a - b) <= eps;
 
 /** Paints a solid or noisy patch and returns a data URL. */
-function patchDataUrl(kind: "white" | "noise"): string {
+function patchDataUrl(kind: "white" | "noise" | "black"): string {
   const c = document.createElement("canvas");
   c.width = 48;
   c.height = 48;
   const ctx = c.getContext("2d")!;
   if (kind === "white") {
     ctx.fillStyle = "#fdfdfd";
+    ctx.fillRect(0, 0, 48, 48);
+  } else if (kind === "black") {
+    ctx.fillStyle = "#050505";
     ctx.fillRect(0, 0, 48, 48);
   } else {
     const img = ctx.createImageData(48, 48);
@@ -194,28 +213,91 @@ export const TEST_CASES: Case[] = [
   {
     id: "I3",
     suite: "RADIOLOGY CNN",
-    name: "Upload inference is deterministic per file",
+    name: "Sample inference is deterministic across runs",
     run: () => {
-      const a = predictImage("upload", "patient_scan.png", "81234-patient_scan.png");
-      const b = predictImage("upload", "patient_scan.png", "81234-patient_scan.png");
+      const a = predictImage("pneumonia-sample", "PA_chest_0412.dcm.png", "seed-1");
+      const b = predictImage("pneumonia-sample", "PA_chest_0412.dcm.png", "seed-1");
       const ok = a.pneumonia === b.pneumonia && a.runId === b.runId;
       return { pass: ok, detail: `runId=${a.runId} · pneumonia=${a.pneumonia.toFixed(1)}% (stable)` };
     },
   },
+
+  /* ----- P · pixel-statistics head (real image measurement) ----- */
   {
-    id: "I4",
-    suite: "RADIOLOGY CNN",
-    name: "Sweep: 12 upload seeds all in-range, classes sum to 100",
+    id: "P1",
+    suite: "PIXEL HEAD",
+    name: "Opacity monotonicity: white film scores higher pneumonia than dark film",
+    run: async () => {
+      const bright = await radiographStats(patchDataUrl("white"));
+      const dark = await radiographStats(patchDataUrl("black"));
+      const pB = opacityToPneumonia(bright);
+      const pD = opacityToPneumonia(dark);
+      const ok = pB > pD && bright.opacity > dark.opacity;
+      return { pass: ok, detail: `white→${pB.toFixed(1)}% · dark→${pD.toFixed(1)}% · opacity ${bright.opacity} vs ${dark.opacity}` };
+    },
+  },
+  {
+    id: "P2",
+    suite: "PIXEL HEAD",
+    name: "Logistic head stays bounded in [4,95] across the opacity sweep",
     run: () => {
       let bad = "";
-      for (let i = 0; i < 12; i++) {
-        const r = predictImage("upload", `study_${i}.png`, `seed-${i}`);
-        if (r.pneumonia < 4 || r.pneumonia > 95 || !near(r.normal + r.pneumonia, 100, 0.11)) {
-          bad = `seed-${i} → ${r.pneumonia.toFixed(1)}%`;
+      for (let o = 0; o <= 1.001; o += 0.1) {
+        const p = opacityToPneumonia({ opacity: o, heterogeneity: 0.2, size: 64 });
+        if (p < 4 || p > 95) {
+          bad = `opacity ${o.toFixed(1)} → ${p}%`;
           break;
         }
       }
-      return { pass: bad === "", detail: bad || "12/12 seeds in [4,95], Σ=100" };
+      return { pass: bad === "", detail: bad || "11/11 sweep points within [4,95]" };
+    },
+  },
+
+  /* ----- T · trained model (Naive Bayes over the reference table) ----- */
+  {
+    id: "T1",
+    suite: "TRAINED MODEL",
+    name: "Posterior is a valid distribution: Σ=100 over all 12 diseases",
+    run: () => {
+      const posts = nbPosteriors(["fever", "cough", "fatigue"], 0.6);
+      const sum = posts.reduce((a, p) => a + p.confidence, 0);
+      const ok = posts.length === 12 && near(sum, 100, 0.5) && posts[0].confidence >= posts[posts.length - 1].confidence;
+      return { pass: ok, detail: `n=${posts.length} · Σ=${sum.toFixed(3)} · sorted=${posts[0].confidence >= posts[posts.length - 1].confidence}` };
+    },
+  },
+  {
+    id: "T2",
+    suite: "TRAINED MODEL",
+    name: "Training is data-derived: priors ∝ row counts, likelihoods smoothed",
+    run: () => {
+      const top = [...NB_MODEL.logPrior.entries()].sort((a, b) => b[1] - a[1])[0];
+      const strep = TRAINING_ROWS.find((r) => r.id === "strep_throat")!;
+      const lik = NB_MODEL.logLik.get("strep_throat")!.get("sore_throat")!;
+      const expected = Math.log((strep.rows + 1) / (strep.rows + 2));
+      const ok = top[0] === "strep_throat" && near(lik, expected, 1e-9);
+      return { pass: ok, detail: `top-prior=${top[0]} · L(sore_throat|strep)=${lik.toFixed(4)} (expected ${expected.toFixed(4)})` };
+    },
+  },
+  {
+    id: "T3",
+    suite: "TRAINED MODEL",
+    name: "Dataset-grounded association: sneeze+runny nose+itching → Allergic Rhinitis",
+    run: () => {
+      const top = nbPosteriors(["sneezing", "runny_nose", "itching"], 0.55)[0];
+      const ok = top.id === "allergic_rhinitis";
+      return { pass: ok, detail: `top=${top.id} @ ${top.confidence.toFixed(1)}%` };
+    },
+  },
+  {
+    id: "T4",
+    suite: "TRAINED MODEL",
+    name: "Priors break exact ties: headache+fatigue+dizziness favors higher-row-count disease",
+    run: () => {
+      const posts = nbPosteriors(["headache", "fatigue", "dizziness"], 0.6);
+      const mig = posts.find((p) => p.id === "migraine")!.confidence;
+      const ten = posts.find((p) => p.id === "tension_headache")!.confidence;
+      const ok = ten > mig; // tension_headache has more rows (170 > 150) and the exact profile
+      return { pass: ok, detail: `tension=${ten.toFixed(1)}% vs migraine=${mig.toFixed(1)}%` };
     },
   },
 
@@ -267,6 +349,36 @@ export const TEST_CASES: Case[] = [
     run: () => {
       const a = matchAnswer("xqz blorp fnord");
       return { pass: a === CHAT_FALLBACK, detail: a === CHAT_FALLBACK ? "fallback returned cleanly" : "unexpected match" };
+    },
+  },
+  {
+    id: "C6",
+    suite: "NLP DESK",
+    name: "\"Which Hugging Face models power this?\" → model-registry lineage answer",
+    run: () => {
+      const a = matchAnswer("Which Hugging Face models power this console?");
+      const ok = a !== CHAT_FALLBACK && a.includes("keremberke");
+      return { pass: ok, detail: ok ? "matched: HF model registry lineage" : `got: ${a.slice(0, 60)}…` };
+    },
+  },
+  {
+    id: "C7",
+    suite: "NLP DESK",
+    name: "Plain deploy question stays on the deploy answer (no HF-registry leakage)",
+    run: () => {
+      const a = matchAnswer("How do I deploy this on Render?");
+      const ok = a.includes("Render") && !a.includes("keremberke");
+      return { pass: ok, detail: ok ? "matched: deployment path, registry text absent" : `got: ${a.slice(0, 60)}…` };
+    },
+  },
+  {
+    id: "C8",
+    suite: "NLP DESK",
+    name: "\"Deploy with Hugging Face Spaces\" → registry answer wins on stronger keyword",
+    run: () => {
+      const a = matchAnswer("How do I deploy this with Hugging Face Spaces?");
+      const ok = a.includes("keremberke");
+      return { pass: ok, detail: ok ? "'hugging' (7 chars) outscored 'deploy' (6 chars) as intended" : `got: ${a.slice(0, 60)}…` };
     },
   },
 
@@ -390,6 +502,18 @@ export const TEST_CASES: Case[] = [
     },
   },
   {
+    id: "B1",
+    suite: "BUNDLE",
+    name: "Sample radiographs ship as bundled assets, never remote URLs",
+    run: () => {
+      const remote = [SAMPLE_XRAY_PNEUMONIA, SAMPLE_XRAY_NORMAL].filter((u) => /^https?:/i.test(u));
+      return {
+        pass: remote.length === 0,
+        detail: remote.length === 0 ? "both studies resolve locally (no ❌ hosts)" : `remote ref: ${remote[0]}`,
+      };
+    },
+  },
+  {
     id: "M2",
     suite: "MODEL ZOO",
     name: "Console coverage: vision ×2, NLP, LLM and multimodal heads all backed",
@@ -402,6 +526,77 @@ export const TEST_CASES: Case[] = [
         pass: ok,
         detail: `vision=${vision} · nlp=${tags.includes("nlp")} · llm=${tags.includes("llm")} · mm=${tags.includes("multimodal")}`,
       };
+    },
+  },
+
+  /* ----- S · semantic utils (real-model math) ----- */
+  {
+    id: "S1",
+    suite: "SEMANTIC UTILS",
+    name: "Cosine: identical vectors → 1, orthogonal → 0",
+    run: () => {
+      const id = cosineSim([1, 2, 3], [1, 2, 3]);
+      const ortho = cosineSim([1, 0], [0, 1]);
+      const ok = near(id, 1, 1e-9) && near(ortho, 0, 1e-9);
+      return { pass: ok, detail: `identical=${id.toFixed(6)} · orthogonal=${ortho.toFixed(6)}` };
+    },
+  },
+  {
+    id: "S2",
+    suite: "SEMANTIC UTILS",
+    name: "Cosine: zero-vector guard returns 0, never NaN",
+    run: () => {
+      const z = cosineSim([0, 0, 0], [1, 1, 1]);
+      const ok = z === 0 && !Number.isNaN(z);
+      return { pass: ok, detail: `zero-guard=${z}` };
+    },
+  },
+
+  /* ----- L · live trainer (SGD on the real disease–symptom dataset) ----- */
+  {
+    id: "L1",
+    suite: "LIVE TRAINER",
+    name: "SGD converges: cross-entropy drops ≥40% within 10 epochs",
+    run: async () => {
+      const m = await trainModel({ epochs: 10, rowsPerClass: 24 });
+      const first = m.lossHistory[0];
+      const last = m.lossHistory[m.lossHistory.length - 1];
+      const ok = last < first * 0.6;
+      return { pass: ok, detail: `loss ${first.toFixed(3)} → ${last.toFixed(3)}` };
+    },
+  },
+  {
+    id: "L2",
+    suite: "LIVE TRAINER",
+    name: "Measured held-out accuracy ≥ 70% on the real associations",
+    run: async () => {
+      const m = await trainModel({ epochs: 20, rowsPerClass: 32 });
+      return {
+        pass: m.metrics.accuracy >= 0.7,
+        detail: `acc=${(m.metrics.accuracy * 100).toFixed(1)}% · F1=${(m.metrics.macroF1 * 100).toFixed(1)}`,
+      };
+    },
+  },
+  {
+    id: "L3",
+    suite: "LIVE TRAINER",
+    name: "Deterministic: same seed ⇒ bit-identical measured accuracy",
+    run: async () => {
+      const a = await trainModel({ epochs: 8, rowsPerClass: 16 });
+      const b = await trainModel({ epochs: 8, rowsPerClass: 16 });
+      const ok = a.metrics.accuracy === b.metrics.accuracy;
+      return { pass: ok, detail: `acc=${(a.metrics.accuracy * 100).toFixed(2)}% on both runs` };
+    },
+  },
+  {
+    id: "L4",
+    suite: "LIVE TRAINER",
+    name: "Trained head: vomiting+diarrhea+nausea ⇒ Gastroenteritis #1",
+    run: async () => {
+      const m = await trainModel({ epochs: 24, rowsPerClass: 32 });
+      const preds = predictWithModel(m, ["vomiting", "diarrhea", "nausea"]);
+      const ok = preds.length > 0 && preds[0].name === "Gastroenteritis";
+      return { pass: ok, detail: `top=${preds[0]?.name ?? "∅"} @ ${((preds[0]?.prob ?? 0) * 100).toFixed(1)}%` };
     },
   },
 ];

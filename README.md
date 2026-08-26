@@ -1,16 +1,21 @@
-# MedLens·AI — Medical Diagnosis Assistant
+# 🩺 MedLens·AI — Medical Diagnosis Assistant
 
-> **Deep Learning in Health Care** — an AI triage workstation combining a symptom encoder, a chest
-> X-ray CNN, a dermoscopy classifier and a medical NLP desk into one decision-support console.
+> **Deep Learning in Health Care** — an AI triage workstation combining a patient registrar,
+> an SGD-trained symptom head, a chest X-ray pipeline, a dermoscopy classifier, a real in-browser
+> transformer encoder, and a medical NLP desk — fused into one decision-support console with a
+> 41-case QA bench.
 
 [![Live on GitHub Pages](https://img.shields.io/badge/LIVE-GitHub%20Pages-0e7c72)](https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/)
-[![QA Bench](https://img.shields.io/badge/QA-24%20cases%20in--browser-16241f)](https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/)
+[![QA Bench](https://img.shields.io/badge/QA-41%20cases%20in--browser-16241f)](https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/)
+[![🤗 Transformers.js](https://img.shields.io/badge/🤗-Transformers.js-FFD21E)](https://huggingface.co/Xenova/all-MiniLM-L6-v2)
 [![License: MIT](https://img.shields.io/badge/License-MIT-a16207.svg)](LICENSE)
 
-⚠️ **Educational simulation only.** MedLens is a learning tool — its predictions are deterministic
-toy-model outputs, not clinical diagnoses. Never use it as a substitute for professional medical advice.
+⚠️ **Educational simulation — not a medical device.** Nothing here is a clinical diagnosis and no
+data ever leaves the browser. If symptoms are severe or worsening, contact a clinician or your local
+emergency number.
 
 ![MedLens console](https://image.qwenlm.ai/generated-images/597b72cb-81ed-4bdb-8a36-76013216f5ee/_result.png)
+*(Banner swaps to `docs/banner.png` if the hosted image expires — the app itself ships zero remote images.)*
 
 ---
 
@@ -42,46 +47,97 @@ The console runs deterministic teaching heads; these are the real models a clini
 ## System architecture
 
 ```
-Patient Input ──► Preprocessing ──► CNN / Encoder ──► Softmax ──► Report
-(symptoms,        (resize 224,       (Conv→Pool→       (class        (findings,
- radiographs,      ÷255, one-hot)      Dense head)      posteriors)    referral)
- dermoscopy)
+ Patient intake ──► Preprocessing ──► Heads ──────────────► Softmax ──► Report
+ (Registrar:        (resize 224,      • SGD-trained symptom   (class      (findings,
+  name, vitals,      ÷255, one-hot,     head (measured acc)    posteriors,  vitals,
+  triage, CC)        CLAHE, Otsu)      • CNN pipeline          red flags)   referral,
+                                       • MiniLM-L6-v2 encoder               ICD-10,
+                                         (chief complaint)                  print/PDF)
+                                       • NLP desk
 ```
+
+## Real data & real models
+
+### Datasets (all public, all linked)
+
+| Dataset | Size | Used for |
+| --- | --- | --- |
+| [Chest X-Ray (Kaggle)](https://www.kaggle.com/datasets/paultimothymooney/chest-xray-pneumonia) | 5,856 radiographs | Radiology lineage |
+| [HAM10000](https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/DBW86T) | 10,015 dermoscopy lesions, 7 classes | Derm lineage |
+| [ISIC 2019](https://challenge2019.isic-archive.com/) | 25,331 images | Derm lineage |
+| [Disease-Symptom Prediction (Kaggle)](https://www.kaggle.com/datasets/itachi9604/disease-symptom-description-dataset) | 30 diseases × ~70 symptoms | **Trains the live SGD head** |
+
+### Model lineage (Hugging Face Hub)
+
+| Console head | Model | Runs in-browser? |
+| --- | --- | --- |
+| Semantic Engine | [`Xenova/all-MiniLM-L6-v2`](https://huggingface.co/Xenova/all-MiniLM-L6-v2) (22M, ONNX q8) | ✅ **Yes — real weights, live inference** |
+| Radiology Lab | [`keremberke/resnet-50-chest-xray-classification`](https://huggingface.co/keremberke/resnet-50-chest-xray-classification) | ⏳ needs ONNX export |
+| Derm Scan | [`syaha/skin_cancer_detection_model`](https://huggingface.co/syaha/skin_cancer_detection_model) (HAM10000) | ⏳ needs ONNX export |
+| Symptom encoding | [`microsoft/BiomedNLP-PubMedBERT`](https://huggingface.co/microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext) (110M) | ⏳ awaits q8 port (~440 MB fp32) |
+| Medical Q&A | [`epfl-llm/meditron-7b`](https://huggingface.co/epfl-llm/meditron-7b) (7B) | ⏳ server territory |
+| Vision foundation | [`microsoft/BiomedCLIP`](https://huggingface.co/microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224) (196M) | ⏳ awaits q8 port |
+
+*Honesty policy: simulated heads say so in the UI. Numbers shown for them illustrate published
+benchmarks; only the Training Grounds and Semantic Engine produce measured outputs.*
+
+## QA bench — 41 cases, 11 suites
+
+| Suite | Cases | Covers |
+| --- | --- | --- |
+| Symptom NLP | 7 | differential correctness, red-flag rules, softmax invariants, determinism |
+| Radiology CNN | 3 | class ranges, heat-map bounds, determinism |
+| Pixel Head | 2 | opacity monotonicity, bounded logits |
+| Trained Model (NB) | 4 | posterior normalization, data-derived priors, dataset-grounded associations |
+| NLP Desk | 8 | KB matching, honest-limitations answer, keyword-strength arbitration |
+| Derm Screen | 4 | pixel statistics, 3-class softmax, ABCDE flags |
+| Registrar | 4 | intake validation, vitals flags, MRN issuance, CSV escaping |
+| Model Zoo | 2 | repo-id integrity, console coverage |
+| Semantic Utils | 2 | cosine identity/orthogonality, NaN guards |
+| Bundle | 1 | sample studies must ship bundled, never remote |
+| Live Trainer | 4 | SGD convergence, measured accuracy ≥ 70%, bit-identical determinism, trained-head behavior |
 
 ## Curriculum coverage (all 13 steps)
 
-1. **Dataset** — tabular symptom table + chest X-ray classes + ISIC-style dermoscopy
-2. **Libraries** — TensorFlow/OpenCV/Pandas/Streamlit path documented in the pipeline walkthrough
-3. **Image loading** — upload, drag-drop, `cv2.imread` semantics in the trace
-4. **Normalization** — `÷255` shown live, with the "why" explained
-5. **CNN build** — full `Sequential` Conv2D/MaxPooling2D/Flatten/Dense architecture
-6. **Compile** — `adam` + `categorical_crossentropy`
-7. **Train** — `model.fit(..., epochs=10, validation_data=...)`
-8. **Predict** — two-class softmax with confidence bars
-9. **Symptom diagnosis** — 24-dim one-hot vector → 12-profile differential
-10. **AI report** — auto-generated patient analysis document
-11. **Interface** — interactive console (React SPA instead of Streamlit)
-12. **Evaluation** — confusion matrix, accuracy / precision / recall, model cards
-13. **Deploy** — GitHub Pages via GitHub Actions
+1. **Dataset** ✅ 2. **Libraries** ✅ 3. **Image loading** ✅ 4. **Normalization** ✅
+5. **CNN build** ✅ 6. **Compile** ✅ 7. **Train** ✅ 8. **Predict** ✅
+9. **Symptom diagnosis** ✅ 10. **AI report** ✅ 11. **Interface** ✅ 12. **Evaluation** ✅ 13. **Deploy** ✅
 
 ## Run locally
 
 ```bash
 npm install
-npm run dev        # develop
-npm run build      # production build
+npm run dev        # develop at localhost:5173
+npm run build      # production build → dist/
 ```
+
+First Semantic Engine arm pulls ~23 MB of ONNX weights once (cached afterwards).
+
+## Deploy (GitHub Pages via Actions)
+
+One-time: **Settings → Pages → Source: "GitHub Actions"**. Every push to `main` builds with
+`--base=./` and publishes to `https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/`.
+
+If GitHub reports a branch merge conflict, follow **[MERGE.md](MERGE.md)** — `bash resolve-conflicts.sh`
+keeps the branch content for every conflicting file in one command.
 
 ## Project structure
 
 ```
 ├── src/
-│   ├── components/      # StatusBar, labs, report, rail panels, QA bench, info sections
-│   ├── data/medical.ts  # knowledge base: 24 symptoms, 12 diseases, chat KB, FAQs
-│   ├── lib/engine.ts    # deterministic inference: hashing, softmax, prediction
-│   ├── lib/tests.ts     # 20-case regression suite
-│   └── App.tsx          # triage console shell
-├── .github/workflows/   # GitHub Pages deployment
+│   ├── assets/              # bundled SVG teaching studies (no remote images)
+│   ├── components/          # Registrar, labs, report, rail, registry, trainer, QA bench
+│   ├── data/
+│   │   ├── medical.ts       # 24 symptoms, 12 profiles, chat KB, HF zoo, FAQs
+│   │   ├── diseaseSymptomDataset.ts  # real Kaggle associations
+│   │   └── training.ts      # embedded NB reference table
+│   └── lib/
+│       ├── engine.ts        # deterministic inference core
+│       ├── naiveBayes.ts    # NB head trained from the reference table
+│       ├── train.ts         # live SGD trainer + measured metrics
+│       ├── semantic.ts      # Transformers.js MiniLM encoder
+│       └── tests.ts         # 41-case QA bench
+├── .github/workflows/deploy.yml   # Pages deployment (with Pages-enabled preflight)
 └── README.md
 ```
 
@@ -92,6 +148,12 @@ Drop captures into `docs/` and link them here:
 ```markdown
 ![Symptom Lab](docs/symptom-lab.png)
 ```
+
+## Roadmap
+
+- Export fine-tuned ResNet-50 / dermoscopy checkpoints to ONNX → real image inference in-browser
+- jsPDF for true PDF download · DICOM via cornerstone.js · ISIC-2019 metrics dashboard
+- FastAPI model server for Meditron-7b Q&A · i18n + PWA shell
 
 ## License
 

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SAMPLE_XRAY_NORMAL, SAMPLE_XRAY_PNEUMONIA } from "../data/medical";
-import { CNN_LOG, predictImage, prefersReducedMotion, sleep } from "../lib/engine";
+import { CNN_LOG, hashString, predictImage, prefersReducedMotion, sleep } from "../lib/engine";
 import type { ImageResult } from "../lib/engine";
+import { opacityToPneumonia, radiographStats, type RadiographFeatures } from "../lib/pixel";
 import { CountUp, Icon } from "./ui";
 
 interface Props {
@@ -20,6 +21,8 @@ export function ImageAnalysis({ onComplete, onPipeline }: Props) {
   const [result, setResult] = useState<ImageResult | null>(null);
   const [fileErr, setFileErr] = useState<string | null>(null);
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
+  const [features, setFeatures] = useState<RadiographFeatures | null>(null);
+  const [imgFailed, setImgFailed] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const alive = useRef(true);
 
@@ -36,6 +39,8 @@ export function ImageAnalysis({ onComplete, onPipeline }: Props) {
     setResult(null);
     setLogIdx(-1);
     setDims(null);
+    setFeatures(null);
+    setImgFailed(false);
     setSource(kind);
     setFileName(kind === "pneumonia-sample" ? "PA_chest_0412.dcm.png" : "PA_chest_0107.dcm.png");
     setSeedKey(String(Date.now()));
@@ -53,6 +58,8 @@ export function ImageAnalysis({ onComplete, onPipeline }: Props) {
       setResult(null);
       setLogIdx(-1);
       setDims(null);
+      setFeatures(null);
+      setImgFailed(false);
       setSource("upload");
       setFileName(file.name);
       setSeedKey(`${file.size}-${file.name}`);
@@ -73,7 +80,29 @@ export function ImageAnalysis({ onComplete, onPipeline }: Props) {
       if (!reduced) await sleep(i === 0 ? 240 : 260);
       if (!alive.current) return;
     }
-    const res = predictImage(source, fileName, seedKey);
+    let res: ImageResult;
+    if (source === "upload") {
+      // real measurement: downscale, measure lung-band opacity + heterogeneity
+      const stats = await radiographStats(imgSrc);
+      if (!alive.current) return;
+      setFeatures(stats);
+      const pneumonia = opacityToPneumonia(stats);
+      const h = hashString(`${stats.opacity}|${stats.heterogeneity}|${fileName}`);
+      res = {
+        source,
+        fileName,
+        pneumonia,
+        normal: Math.round((100 - pneumonia) * 10) / 10,
+        heat: {
+          x: 28 + stats.opacity * 44,
+          y: 44 + stats.heterogeneity * 42,
+          size: 16 + stats.opacity * 22,
+        },
+        runId: `PX-${String(h % 9973).padStart(4, "0")}`,
+      };
+    } else {
+      res = predictImage(source, fileName, seedKey);
+    }
     setResult(res);
     onComplete(res);
     onPipeline(4, false);
@@ -156,15 +185,28 @@ export function ImageAnalysis({ onComplete, onPipeline }: Props) {
 
           {imgSrc ? (
             <div className="relative w-full p-4">
-              <img
-                src={imgSrc}
-                alt={fileName || "Chest radiograph"}
-                onLoad={(e) =>
-                  setDims({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })
-                }
-                className="mx-auto max-h-[340px] w-auto max-w-full border border-mint/25 object-contain"
-                draggable={false}
-              />
+              {imgFailed ? (
+                <div className="mx-auto grid max-w-sm place-items-center border border-alert/40 bg-alert/10 px-6 py-10 text-center">
+                  <Icon name="warn" className="h-8 w-8 text-alert" />
+                  <p className="mt-3 font-mono text-[10px] font-bold tracking-[0.24em] text-alert">
+                    STUDY BUFFER LOST
+                  </p>
+                  <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-paper/50">
+                    The image could not be decoded. Load a sample study or drop another radiograph.
+                  </p>
+                </div>
+              ) : (
+                <img
+                  src={imgSrc}
+                  alt={fileName || "Chest radiograph"}
+                  onLoad={(e) =>
+                    setDims({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })
+                  }
+                  onError={() => setImgFailed(true)}
+                  className="mx-auto max-h-[340px] w-auto max-w-full border border-mint/25 object-contain"
+                  draggable={false}
+                />
+              )}
               {running && <span className="scanline" />}
               {result && !running && (
                 <span
@@ -185,6 +227,7 @@ export function ImageAnalysis({ onComplete, onPipeline }: Props) {
               )}
               <p className="mt-2 text-center font-mono text-[10px] tracking-[0.2em] text-mint/60">
                 {fileName.toUpperCase() || "AWAITING STUDY"}
+                {source !== "upload" && <span className="text-amber"> · SYNTHETIC TEACHING STUDY</span>}
                 {dims && <span className="text-mint"> · {dims.w}×{dims.h}px</span>} · DROP OR BROWSE TO REPLACE
               </p>
             </div>
@@ -256,9 +299,21 @@ export function ImageAnalysis({ onComplete, onPipeline }: Props) {
                   </div>
                 </div>
               ))}
+              {features && result.source === "upload" && (
+                <div className="mb-3 border border-dashed border-teal/40 bg-teal/8 px-3 py-2">
+                  <p className="font-mono text-[9px] font-bold tracking-[0.22em] text-teal">
+                    MEASURED FROM ACTUAL PIXELS
+                  </p>
+                  <p className="mt-0.5 font-mono text-[10px] tabular-nums text-inksoft">
+                    lung-band opacity {features.opacity.toFixed(3)} · heterogeneity{" "}
+                    {features.heterogeneity.toFixed(3)} → fixed logistic head
+                  </p>
+                </div>
+              )}
               <p className="mt-3 border-t border-dashed border-ink/20 pt-2 font-mono text-[10px] leading-relaxed text-inksoft">
-                Grad-CAM hotspot marks the region driving the decision. Educational simulation — a
-                radiologist confirms every real study.
+                {result.source === "upload"
+                  ? "The feature-statistics head measured this study's real pixel content — opacity is the classic radiographic sign of consolidation. Educational, not diagnostic."
+                  : "Grad-CAM hotspot marks the region driving the decision. Educational simulation — a radiologist confirms every real study."}
               </p>
             </div>
           )}

@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Synthetic teaching chest radiograph with right lower lobe pneumonia pattern">
+  <defs>
+    <radialGradient id="film" cx="50%" cy="44%" r="78%">
+      <stop offset="0%" stop-color="#131313"/>
+      <stop offset="68%" stop-color="#0a0a0a"/>
+      <stop offset="100%" stop-color="#020202"/>
+    </radialGradient>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="6"/>
+    </filter>
+    <filter id="softer" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.06 0"/>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" fill="url(#film)"/>
+
+  <!-- torso silhouette -->
+  <path d="M92 66 C150 28 362 28 420 66 L452 468 C344 502 168 502 60 468 Z" fill="#1d1d1d" filter="url(#soft)"/>
+
+  <!-- lung fields -->
+  <path d="M126 112 C106 194 104 302 128 394 C168 424 218 414 238 380 L238 132 C208 96 150 92 126 112 Z" fill="#070707" filter="url(#soft)"/>
+  <path d="M386 112 C406 194 408 302 384 394 C344 424 294 414 274 380 L274 132 C304 96 362 92 386 112 Z" fill="#070707" filter="url(#soft)"/>
+
+  <!-- spine -->
+  <rect x="247" y="78" width="18" height="336" fill="#3d3d3d" filter="url(#softer)"/>
+
+  <!-- mediastinum + cardiac silhouette -->
+  <ellipse cx="294" cy="302" rx="80" ry="94" fill="#c9c9c9" opacity="0.85" filter="url(#softer)"/>
+  <rect x="252" y="96" width="34" height="150" fill="#8f8f8f" opacity="0.5" filter="url(#softer)"/>
+
+  <!-- clavicles -->
+  <path d="M116 98 Q188 72 252 92" stroke="#e6e6e6" stroke-width="9" fill="none" opacity="0.8" filter="url(#soft)"/>
+  <path d="M396 98 Q324 72 260 92" stroke="#e6e6e6" stroke-width="9" fill="none" opacity="0.8" filter="url(#soft)"/>
+
+  <!-- ribs · patient right (image left) -->
+  <g stroke="#c4c4c4" stroke-width="7" fill="none" opacity="0.5" filter="url(#soft)">
+    <path d="M114 142 Q178 118 240 138"/>
+    <path d="M110 176 Q176 150 240 170"/>
+    <path d="M107 212 Q174 184 240 204"/>
+    <path d="M105 248 Q172 220 240 240"/>
+    <path d="M104 286 Q171 256 240 276"/>
+    <path d="M104 324 Q170 294 240 312"/>
+    <path d="M106 362 Q170 332 240 348"/>
+  </g>
+  <!-- ribs · patient left (image right) -->
+  <g stroke="#c4c4c4" stroke-width="7" fill="none" opacity="0.5" filter="url(#soft)">
+    <path d="M398 142 Q334 118 272 138"/>
+    <path d="M402 176 Q336 150 272 170"/>
+    <path d="M405 212 Q338 184 272 204"/>
+    <path d="M407 248 Q340 220 272 240"/>
+    <path d="M408 286 Q341 256 272 276"/>
+    <path d="M408 324 Q342 294 272 312"/>
+    <path d="M406 362 Q342 332 272 348"/>
+  </g>
+
+  <!-- diaphragm domes -->
+  <path d="M118 402 Q186 358 242 398" stroke="#d6d6d6" stroke-width="11" fill="none" opacity="0.7" filter="url(#soft)"/>
+  <path d="M394 402 Q326 354 270 398" stroke="#d6d6d6" stroke-width="11" fill="none" opacity="0.7" filter="url(#soft)"/>
+
+  <!-- pneumonia consolidation · right lower lobe (image left) -->
+  <ellipse cx="182" cy="342" rx="54" ry="42" fill="#f0f0f0" opacity="0.92" filter="url(#softer)"/>
+  <ellipse cx="158" cy="368" rx="36" ry="27" fill="#ffffff" opacity="0.8" filter="url(#soft)"/>
+  <ellipse cx="206" cy="318" rx="26" ry="18" fill="#e8e8e8" opacity="0.7" filter="url(#soft)"/>
+  <!-- air bronchograms -->
+  <g stroke="#101010" stroke-width="3" opacity="0.85" stroke-linecap="round">
+    <path d="M170 332 L158 354"/>
+    <path d="M176 340 L190 358"/>
+    <path d="M166 344 L172 364"/>
+  </g>
+  <!-- blunted costophrenic angle -->
+  <ellipse cx="128" cy="392" rx="22" ry="14" fill="#dcdcdc" opacity="0.6" filter="url(#soft)"/>
+
+  <!-- film grain + marker -->
+  <rect width="512" height="512" filter="url(#grain)"/>
+  <text x="28" y="54" font-family="ui-monospace, monospace" font-size="26" fill="#b9b9b9" opacity="0.85">R</text>
+</svg>

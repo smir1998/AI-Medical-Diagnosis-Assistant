@@ -414,19 +414,11 @@ export const FAQS = [
   },
 ];
 
-export const SAMPLE_DATASET = [
-  { fever: 1, cough: 1, headache: 0, disease: "Flu" },
-  { fever: 1, cough: 1, headache: 1, disease: "COVID-19" },
-  { fever: 0, cough: 0, headache: 1, disease: "Migraine" },
-  { fever: 1, cough: 1, headache: 0, disease: "Pneumonia" },
-  { fever: 0, cough: 1, headache: 0, disease: "Common Cold" },
-  { fever: 1, cough: 0, headache: 1, disease: "Dengue" },
-];
+/* Sample symptom table retired — the encoder now trains on the embedded
+   clinical reference table in src/data/training.ts (see Naive Bayes engine). */
 
-export const SAMPLE_XRAY_PNEUMONIA =
-  "https://image.qwenlm.ai/generated-images/c9aee7f6-2b13-45d5-a7bf-7f769697cf51/_result.png";
-export const SAMPLE_XRAY_NORMAL =
-  "https://image.qwenlm.ai/generated-images/12db6a24-0b22-469e-bbf6-94d7bb1eec08/_result.png";
+export { default as SAMPLE_XRAY_PNEUMONIA } from "../assets/cxr-pneumonia.svg";
+export { default as SAMPLE_XRAY_NORMAL } from "../assets/cxr-normal.svg";
 
 export const TICKER_ITEMS = [
   "12,480 scans analyzed",

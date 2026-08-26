@@ -2,14 +2,22 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { DURATIONS, SYMPTOMS, SYMPTOM_GROUPS } from "../data/medical";
 import { analyzeSymptoms, prefersReducedMotion, sleep } from "../lib/engine";
 import type { SymptomResult } from "../lib/engine";
+import { NB_ALPHA, NB_MODEL } from "../lib/naiveBayes";
 import { CountUp, Icon } from "./ui";
+import {
+  SEMANTIC_MODEL_ID,
+  SIM_THRESHOLD,
+  semanticMatch,
+  type SemanticMatch,
+  type SemanticStatus,
+} from "../lib/semantic";
 
 const RUN_SCRIPT = [
   { stage: 0, line: "▸ encoding symptom vector … 24-dim binary" },
   { stage: 0, line: "▸ duration × severity weighting applied" },
-  { stage: 1, line: "▸ embedding layer → 12 disease prototypes" },
-  { stage: 2, line: "▸ attention over 12 profiles · temp=2.1" },
-  { stage: 3, line: "▸ softmax → posterior probabilities" },
+  { stage: 1, line: "▸ Laplace-smoothed log-likelihoods (α=1)" },
+  { stage: 2, line: "▸ log-priors from 2,550 weighted rows" },
+  { stage: 3, line: "▸ normalize → posterior probabilities" },
   { stage: 3, line: "▸ red-flag rule engine … scanning" },
   { stage: 4, line: "✓ inference complete — compiling report" },
 ];
@@ -103,9 +111,45 @@ export function SymptomChecker({ onComplete, onPipeline, chiefComplaint }: Props
     [chiefComplaint]
   );
 
+  /* ---------- real HF model: semantic CC matcher ---------- */
+  const [semStatus, setSemStatus] = useState<SemanticStatus>({ kind: "idle" });
+  const [semMatches, setSemMatches] = useState<SemanticMatch[]>([]);
+  const semBusy = useRef(false);
+
+  useEffect(() => {
+    // chart changed → re-arm required
+    setSemMatches([]);
+    setSemStatus({ kind: "idle" });
+  }, [chiefComplaint]);
+
+  const armSemantic = async () => {
+    if (!chiefComplaint || chiefComplaint === "—" || semBusy.current) return;
+    semBusy.current = true;
+    setSemStatus({ kind: "loading", file: "onnx/model_quantized.onnx", pct: 0 });
+    try {
+      const matches = await semanticMatch(chiefComplaint, (file, pct) => {
+        if (alive.current) setSemStatus({ kind: "loading", file, pct });
+      });
+      if (!alive.current) return;
+      setSemMatches(matches);
+      setSemStatus({ kind: "live" });
+      setLog((prev) => [
+        ...prev,
+        `▸ semantic matcher: ${matches.length} symptom(s) ≥ cos ${SIM_THRESHOLD}`,
+      ]);
+    } catch {
+      if (alive.current)
+        setSemStatus({ kind: "error", reason: "model unreachable — regex map active" });
+    } finally {
+      semBusy.current = false;
+    }
+  };
+
+  const effectiveCc = semStatus.kind === "live" ? semMatches.map((m) => m.id) : ccMatches;
+
   const applyCc = () => {
-    if (running || ccMatches.length === 0) return;
-    setSelected((prev) => new Set([...prev, ...ccMatches]));
+    if (running || effectiveCc.length === 0) return;
+    setSelected((prev) => new Set([...prev, ...effectiveCc]));
     setResult(null);
   };
 
@@ -155,21 +199,79 @@ export function SymptomChecker({ onComplete, onPipeline, chiefComplaint }: Props
 
   return (
     <div className="space-y-6">
-      {/* chart cross-link — pulls symptoms from the active patient's chief complaint */}
-      {ccMatches.length > 0 && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-2 border-teal/45 bg-teal/10 px-3.5 py-2.5">
-          <Icon name="stetho" className="h-4 w-4 shrink-0 text-teal" />
-          <span className="min-w-0 font-mono text-[10px] leading-relaxed tracking-wider text-inksoft">
-            CHART CC <span className="font-bold text-ink">“{chiefComplaint}”</span> → {ccMatches.length} matching
-            symptom{ccMatches.length > 1 ? "s" : ""} in the 24-dim vector
-          </span>
-          <button
-            onClick={applyCc}
-            disabled={running}
-            className="ml-auto inline-flex shrink-0 items-center gap-1.5 border border-teal bg-paper px-2.5 py-1 font-mono text-[9px] font-bold tracking-[0.18em] text-teal transition-all duration-200 hover:-translate-y-px hover:bg-teal hover:text-paper disabled:opacity-40"
-          >
-            <Icon name="arrow" className="h-3 w-3" /> PULL INTO VECTOR
-          </button>
+      {/* chart cross-link + real-model semantic engine */}
+      {chiefComplaint && chiefComplaint !== "—" && (
+        <div className="border-2 border-teal/45 bg-teal/10">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3.5 py-2.5">
+            <Icon name="stetho" className="h-4 w-4 shrink-0 text-teal" />
+            <span className="min-w-0 font-mono text-[10px] leading-relaxed tracking-wider text-inksoft">
+              CHART CC <span className="font-bold text-ink">“{chiefComplaint}”</span> → {ccMatches.length} keyword
+              match{ccMatches.length === 1 ? "" : "es"}
+            </span>
+            {semStatus.kind === "idle" && (
+              <button
+                onClick={armSemantic}
+                disabled={running}
+                className="ml-auto inline-flex shrink-0 items-center gap-1.5 border border-ink bg-paper px-2.5 py-1 font-mono text-[9px] font-bold tracking-[0.18em] text-ink transition-all duration-200 hover:-translate-y-px hover:bg-ink hover:text-paper disabled:opacity-40"
+                title="Runs Xenova/all-MiniLM-L6-v2 (ONNX q8, ≈22.7 MB) in this browser via Transformers.js"
+              >
+                <Icon name="brain" className="h-3 w-3" /> ARM SEMANTIC ENGINE
+              </button>
+            )}
+            {semStatus.kind === "loading" && (
+              <span className="ml-auto inline-flex shrink-0 items-center gap-2 font-mono text-[9px] font-bold tracking-[0.18em] text-ink">
+                <span className="blink-soft">▮▮▮</span> PULLING WEIGHTS
+                <span className="inline-block h-1.5 w-20 bg-ink/15">
+                  <span
+                    className="block h-full bg-teal transition-all duration-200"
+                    style={{ width: `${Math.min(100, semStatus.pct)}%` }}
+                  />
+                </span>
+                {Math.round(semStatus.pct)}%
+              </span>
+            )}
+            {semStatus.kind === "live" && (
+              <span className="ml-auto inline-flex shrink-0 items-center gap-1.5 font-mono text-[9px] font-bold tracking-[0.18em] text-teal">
+                <span className="h-1.5 w-1.5 rounded-full bg-teal dot-live" /> LIVE · {SEMANTIC_MODEL_ID} · 384-DIM
+              </span>
+            )}
+            {semStatus.kind === "error" && (
+              <span className="ml-auto inline-flex shrink-0 items-center gap-1.5 font-mono text-[9px] font-bold tracking-[0.18em] text-alertdeep">
+                <Icon name="warn" className="h-3 w-3 text-alert" /> {semStatus.reason.toUpperCase()}
+              </span>
+            )}
+          </div>
+
+          {/* ranked semantic matches */}
+          {semStatus.kind === "live" && semMatches.length > 0 && (
+            <div className="border-t border-dashed border-teal/40 px-3.5 py-2.5">
+              <p className="mb-1.5 font-mono text-[9px] font-bold tracking-[0.22em] text-inksoft">
+                COSINE RANK · THRESHOLD {SIM_THRESHOLD} · {semMatches.length} HIT{semMatches.length === 1 ? "" : "S"}
+              </p>
+              <ul className="space-y-1">
+                {semMatches.slice(0, 6).map((m) => (
+                  <li key={m.id} className="flex items-center gap-2.5 font-mono text-[11px]">
+                    <span className="w-40 shrink-0 truncate font-semibold text-ink">{m.label}</span>
+                    <span className="h-1.5 flex-1 bg-ink/10">
+                      <span className="bar-fill block h-full bg-teal" style={{ width: `${Math.min(100, m.score * 100)}%` }} />
+                    </span>
+                    <span className="w-12 shrink-0 text-right tabular-nums text-teal">{m.score.toFixed(2)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="flex items-center justify-end border-t border-dashed border-teal/40 px-3.5 py-2">
+            <button
+              onClick={applyCc}
+              disabled={running || effectiveCc.length === 0}
+              className="inline-flex shrink-0 items-center gap-1.5 border border-teal bg-paper px-2.5 py-1 font-mono text-[9px] font-bold tracking-[0.18em] text-teal transition-all duration-200 hover:-translate-y-px hover:bg-teal hover:text-paper disabled:opacity-40"
+            >
+              <Icon name="arrow" className="h-3 w-3" />
+              PULL {effectiveCc.length} INTO VECTOR
+            </button>
+          </div>
         </div>
       )}
 
@@ -376,7 +478,9 @@ export function SymptomChecker({ onComplete, onPipeline, chiefComplaint }: Props
             <h3 className="font-display text-sm font-extrabold uppercase tracking-wide">
               Differential diagnosis <span className="text-inksoft">· run {result.meta.runId}</span>
             </h3>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-teal">softmax · T=2.1</span>
+            <span className="font-mono text-[10px] uppercase tracking-widest text-teal">
+              multinomial NB · α={NB_ALPHA} · trained on {NB_MODEL.rows.toLocaleString()} rows
+            </span>
           </div>
 
           {result.redFlags.length > 0 && (

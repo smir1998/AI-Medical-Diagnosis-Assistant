@@ -6,6 +6,8 @@ import {
   DURATIONS,
 } from "../data/medical";
 import type { Disease } from "../data/medical";
+import { TRAINING_ROWS } from "../data/training";
+import { evidenceGamma, nbPosteriors } from "./naiveBayes";
 
 /* ---------- deterministic pseudo-random helpers ---------- */
 
@@ -47,33 +49,28 @@ export function analyzeSymptoms(
   durationIdx: number,
   severity: number
 ): SymptomResult {
-  const durationFactor = [0.85, 1.0, 1.12, 1.22][Math.min(durationIdx, 3)];
-  const severityFactor = 0.72 + (severity / 10) * 0.56;
+  // Evidence strength: thin evidence → wide posteriors; a full review sharpens them.
+  const durationFactor = [0.92, 1.0, 1.05, 1.1][Math.min(durationIdx, 3)];
+  const severityFactor = 0.85 + (severity / 10) * 0.3;
+  const gamma = evidenceGamma(selectedIds.length) * durationFactor * severityFactor;
 
-  const raw = DISEASES.map((d) => {
-    let score = d.base;
-    const matched: string[] = [];
-    for (const id of selectedIds) {
-      const w = d.weights[id];
-      if (w === undefined) continue;
-      const jitter = 0.88 + 0.24 * rand01(hashString(d.id + id));
-      score += w * jitter;
-      if (w > 0) matched.push(id);
-    }
-    return { d, score: Math.max(0.05, score) * durationFactor * severityFactor, matched };
+  // Trained multinomial NB posterior over the reference table (no hand-tuning).
+  const posteriors = nbPosteriors(selectedIds, gamma);
+  const trainingById = new Map(TRAINING_ROWS.map((r) => [r.id, r]));
+  const selectedSet = new Set(selectedIds);
+
+  const scored: ScoredDisease[] = posteriors.map((p) => {
+    const d = DISEASES.find((x) => x.id === p.id) ?? DISEASES[0];
+    const profile = trainingById.get(p.id);
+    const matched = profile
+      ? profile.symptoms.filter((s) => selectedSet.has(s))
+      : [];
+    return {
+      disease: d,
+      confidence: p.confidence,
+      matched: matched.map((id) => SYMPTOMS.find((s) => s.id === id)?.label ?? id),
+    };
   });
-
-  const max = Math.max(...raw.map((r) => r.score));
-  const exps = raw.map((r) => Math.exp((r.score - max) / 2.1));
-  const sum = exps.reduce((a, b) => a + b, 0);
-
-  const scored: ScoredDisease[] = raw
-    .map((r, i) => ({
-      disease: r.d,
-      confidence: (exps[i] / sum) * 100,
-      matched: r.matched.map((id) => SYMPTOMS.find((s) => s.id === id)?.label ?? id),
-    }))
-    .sort((a, b) => b.confidence - a.confidence);
 
   const redFlags: string[] = [];
   for (const id of selectedIds) {

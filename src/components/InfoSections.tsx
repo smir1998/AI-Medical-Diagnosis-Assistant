@@ -1,6 +1,10 @@
 import { useState } from "react";
+import { CONFUSION, FAQS, HF_MODEL_ZOO, SYMPTOMS, TRAINING_STEPS } from "../data/medical";
+import { TRAINING_ROWS, TRAINING_SOURCE, TRAINING_TOTAL_ROWS } from "../data/training";
+import { NB_ALPHA, NB_MODEL } from "../lib/naiveBayes";
 import { CONFUSION, FAQS, HF_MODEL_ZOO, SAMPLE_DATASET, TRAINING_STEPS } from "../data/medical";
 import { CountUp, ECGLine, Icon, Reveal, SectionTag } from "./ui";
+import type { ModelMetrics } from "../lib/train";
 
 /* ---------- inside the model: sticky two-column ---------- */
 
@@ -87,9 +91,11 @@ model.fit(X_train, y_train, epochs=10,
   );
 }
 
-/* ---------- evaluation ---------- */
+/**
+ * Displays confusion-matrix results and derived accuracy, precision, and recall metrics for the simulated PneumoNet v3 evaluation.
+ */
 
-export function Evaluation() {
+export function Evaluation({ liveMetrics }: { liveMetrics?: ModelMetrics | null }) {
   const total = CONFUSION.tp + CONFUSION.fp + CONFUSION.fn + CONFUSION.tn;
   const metrics = [
     { label: "Accuracy", v: ((CONFUSION.tp + CONFUSION.tn) / total) * 100, cls: "bg-teal" },
@@ -170,6 +176,40 @@ export function Evaluation() {
 
               <div className="border border-mint/20 bg-paper/5 p-4">
                 <p className="flex items-center gap-2 font-mono text-[10px] font-bold tracking-[0.22em] text-mint/70">
+                  <Icon name="layers" className="h-3.5 w-3.5" />{" "}
+                  {liveMetrics ? "SYMPTOM ENCODER · MEASURED LIVE" : "PRODUCTION LINEAGE"}
+                  {liveMetrics && <span className="blink-soft ml-auto text-mint">● TRAINED</span>}
+                </p>
+                {liveMetrics ? (
+                  <>
+                    <div className="mt-3 grid grid-cols-4 gap-2 text-center">
+                      {[
+                        { k: "ACC", v: liveMetrics.accuracy },
+                        { k: "PREC", v: liveMetrics.macroPrecision },
+                        { k: "REC", v: liveMetrics.macroRecall },
+                        { k: "F1", v: liveMetrics.macroF1 },
+                      ].map((m) => (
+                        <div key={m.k} className="border border-mint/20 bg-pinedeep/60 py-2">
+                          <p className="font-mono text-[8px] tracking-[0.18em] text-paper/45">{m.k}</p>
+                          <p className="mt-0.5 font-display text-base font-black tabular-nums text-mint">
+                            {(m.v * 100).toFixed(1)}%
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-2.5 text-[12px] leading-relaxed text-paper/70">
+                      Computed on {liveMetrics.testRows} held-out rows by the trainer in the Training
+                      Grounds below — <span className="text-mint">measured, not invented</span>.
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-2 text-[13px] leading-relaxed text-paper/70">
+                    These bars score the simulated PneumoNet v3 head. A clinical deployment swaps in the
+                    verified Hugging Face models from the <span className="text-mint">Model Registry</span>{" "}
+                    below — and the <span className="text-mint">Training Grounds</span> replace the symptom
+                    encoder's numbers with live-measured ones.
+                  </p>
+                )}
                   <Icon name="layers" className="h-3.5 w-3.5" /> PRODUCTION LINEAGE
                 </p>
                 <p className="mt-2 text-[13px] leading-relaxed text-paper/70">
@@ -195,6 +235,12 @@ const TAG_STYLE: Record<string, string> = {
   multimodal: "bg-ink/10 text-ink border-ink/30",
 };
 
+/**
+ * Displays verified Hugging Face models associated with the console's diagnostic heads.
+ *
+ * Each model card links to its Hugging Face repository and presents its role, architecture,
+ * parameter count, training dataset, and headline metric.
+ */
 export function ModelRegistry() {
   return (
     <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-6">
@@ -281,6 +327,9 @@ export function ModelRegistry() {
   );
 }
 
+/**
+ * Presents expandable medical-AI interview questions alongside a toy symptom dataset table.
+ */
 /* ---------- field notes: FAQ + dataset ---------- */
 
 export function FieldNotes() {
@@ -340,47 +389,119 @@ export function FieldNotes() {
           </div>
         </div>
 
-        {/* dataset table */}
-        <div>
+        {/* training table + honesty ledger */}
+        <div className="space-y-10">
           <Reveal delay={100}>
-            <SectionTag>Training data</SectionTag>
+            <SectionTag>
+              Training data · {TRAINING_TOTAL_ROWS.toLocaleString()} rows · {NB_MODEL.dims}-dim
+            </SectionTag>
             <h3 className="mt-4 font-display text-2xl font-black tracking-tight">
-              The symptom table<span className="text-alert">.</span>
+              Where the encoder learned<span className="text-alert">.</span>
             </h3>
             <p className="mt-3 text-sm leading-relaxed text-inksoft">
-              Before images, the model learns from a tabular toy set — binary symptom features mapped to
-              labels. The same one-hot logic powers the Symptom Lab above.
+              The Symptom Lab runs a <strong className="text-ink">multinomial Naive Bayes</strong>{" "}
+              classifier trained at load from this embedded clinical reference table — priors from row
+              counts, likelihoods Laplace-smoothed (α={NB_ALPHA}), posteriors computed per run. No
+              hand-tuned weights remain.
             </p>
-            <div className="mt-6 overflow-x-auto border-2 border-ink bg-paper shadow-[6px_6px_0_0_rgba(12,43,43,0.85)]">
-              <table className="w-full min-w-[400px] font-mono text-xs">
-                <thead>
+            <div className="log-scroll mt-5 max-h-[340px] overflow-y-auto border-2 border-ink bg-paper shadow-[6px_6px_0_0_rgba(12,43,43,0.85)]">
+              <table className="w-full font-mono text-[11px]">
+                <thead className="sticky top-0 z-10">
                   <tr className="bg-ink text-paper">
-                    {["fever", "cough", "headache", "disease"].map((h) => (
-                      <th key={h} className="px-4 py-2.5 text-left font-semibold tracking-widest">
-                        {h}
-                      </th>
-                    ))}
+                    <th className="px-3 py-2 text-left font-semibold tracking-widest">DISEASE</th>
+                    <th className="px-3 py-2 text-right font-semibold tracking-widest">ROWS</th>
+                    <th className="px-3 py-2 text-left font-semibold tracking-widest">LEARNED PROFILE</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {SAMPLE_DATASET.map((r, i) => (
+                  {TRAINING_ROWS.map((r, i) => (
                     <tr
-                      key={i}
-                      className={`border-t border-ink/10 transition-colors hover:bg-teal/10 ${i % 2 ? "bg-paperdeep/50" : ""}`}
+                      key={r.id}
+                      className={`border-t border-ink/10 align-top transition-colors hover:bg-teal/10 ${
+                        i % 2 ? "bg-paperdeep/50" : ""
+                      }`}
                     >
-                      <td className="px-4 py-2.5 tabular-nums">{r.fever}</td>
-                      <td className="px-4 py-2.5 tabular-nums">{r.cough}</td>
-                      <td className="px-4 py-2.5 tabular-nums">{r.headache}</td>
-                      <td className="px-4 py-2.5 font-bold text-teal">{r.disease}</td>
+                      <td className="px-3 py-2.5 font-sans text-xs font-bold text-ink">{r.name}</td>
+                      <td className="px-3 py-2.5 text-right tabular-nums text-teal">{r.rows}</td>
+                      <td className="px-3 py-2.5">
+                        <span className="flex flex-wrap gap-1">
+                          {r.symptoms.map((s) => (
+                            <span
+                              key={s}
+                              className="border border-teal/30 bg-teal/10 px-1.5 py-0.5 text-[9px] tracking-wide text-teal"
+                            >
+                              {SYMPTOMS.find((x) => x.id === s)?.label ?? s}
+                            </span>
+                          ))}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <p className="mt-4 flex items-start gap-2 font-mono text-[11px] leading-relaxed text-inksoft/80">
+            <p className="mt-3 font-mono text-[10px] leading-relaxed tracking-wide text-inksoft/70">
+              SOURCE — {TRAINING_SOURCE}
+            </p>
+          </Reveal>
+
+          {/* honesty ledger */}
+          <Reveal delay={160}>
+            <SectionTag tone="alert">Honesty ledger</SectionTag>
+            <h3 className="mt-4 font-display text-2xl font-black tracking-tight">
+              What's real, exactly<span className="text-teal">.</span>
+            </h3>
+            <div className="mt-5 border-2 border-ink bg-paper shadow-[6px_6px_0_0_rgba(12,43,43,0.85)]">
+              {[
+                {
+                  what: "Symptom differential",
+                  status: "REAL MATH",
+                  tone: "bg-teal text-paper",
+                  detail: `NB trained on ${TRAINING_TOTAL_ROWS.toLocaleString()} embedded rows · posteriors computed per run`,
+                },
+                {
+                  what: "Upload X-ray score",
+                  status: "REAL PIXELS",
+                  tone: "bg-teal text-paper",
+                  detail: "lung-band opacity + heterogeneity measured from your image → fixed logistic head",
+                },
+                {
+                  what: "Derm risk profile",
+                  status: "REAL PIXELS",
+                  tone: "bg-teal text-paper",
+                  detail: "mean / variance / heterogeneity of the lesion crop → 3-class softmax",
+                },
+                {
+                  what: "CNN weights · CXR + skin",
+                  status: "DOCUMENTED",
+                  tone: "bg-amber text-paper",
+                  detail: `HF Hub lineage in the registry (${HF_MODEL_ZOO.length} verified models) — awaiting ONNX export to run here`,
+                },
+                {
+                  what: "Red-flag rules",
+                  status: "CURATED",
+                  tone: "bg-ink text-paper",
+                  detail: "clinical-guideline logic — deterministic, auditable, separate from the model",
+                },
+              ].map((row) => (
+                <div
+                  key={row.what}
+                  className="group flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-ink/10 px-4 py-3 transition-colors first:border-t-0 hover:bg-teal/8"
+                >
+                  <span className={`shrink-0 px-2 py-0.5 font-mono text-[9px] font-bold tracking-[0.18em] ${row.tone}`}>
+                    {row.status}
+                  </span>
+                  <span className="font-display text-[13px] font-extrabold">{row.what}</span>
+                  <span className="w-full font-mono text-[10px] leading-relaxed text-inksoft sm:ml-auto sm:w-auto sm:max-w-[46%] sm:text-right">
+                    {row.detail}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 flex items-start gap-2 font-mono text-[10px] leading-relaxed text-inksoft/70">
               <Icon name="warn" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber" />
-              Real deployments train on thousands of labelled records with clinician review — never a
-              six-row table. This one exists so the math stays visible.
+              "Real" here means computed from data or measured from your input — still educational,
+              never diagnostic. Clinical deployment means clinician-labelled data and regulatory review.
             </p>
           </Reveal>
         </div>

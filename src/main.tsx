@@ -48,8 +48,25 @@ window.addEventListener("unhandledrejection", (e) => {
   }
 });
 
-try {
-  ReactDOM.createRoot(document.getElementById("root")!).render(<App />);
-} catch (err) {
-  fatalScreen("React could not mount.", err instanceof Error ? err.message : String(err));
+/*
+ * Double-mount guard: the boot watchdog can legitimately inject a second
+ * copy of this module (dev retry, or the compiled-bundle fallback racing a
+ * late dev-server recovery). Without this flag, createRoot would run twice
+ * on the same container and render a duplicated, broken console.
+ */
+declare global {
+  interface Window {
+    __MEDLENS_BOOTED__?: boolean;
+  }
+}
+
+if (window.__MEDLENS_BOOTED__) {
+  // a previous copy already owns the root — this one stands down
+} else {
+  window.__MEDLENS_BOOTED__ = true;
+  try {
+    ReactDOM.createRoot(document.getElementById("root")!).render(<App />);
+  } catch (err) {
+    fatalScreen("React could not mount.", err instanceof Error ? err.message : String(err));
+  }
 }

@@ -38,6 +38,58 @@
   </head>
   <body>
     <div id="root"></div>
+    <!--
+      Inline boot watchdog — plain JS that runs BEFORE any module loads.
+      If the module graph fails (missing file, blocked script, stale cache)
+      main.tsx never executes, so only an inline script can report it.
+    -->
+    <script>
+      (function () {
+        var style =
+          "position:fixed;inset:0;display:grid;place-items:center;background:#0b2f2c;" +
+          "font-family:ui-monospace,Menlo,monospace;color:#f5f1e6;padding:24px;";
+        var box =
+          "max-width:580px;width:100%;border:2px solid #c7463c;background:#07211e;" +
+          "padding:28px;box-shadow:8px 8px 0 rgba(0,0,0,0.45);";
+        function diag(title, detail) {
+          var root = document.getElementById("root");
+          if (!root || root.hasChildNodes() || document.querySelector("[data-fatal]")) return;
+          root.innerHTML =
+            '<div data-fatal style="' + style + '"><div style="' + box + '">' +
+            '<div style="font-size:11px;letter-spacing:0.3em;color:#8fe3cf;opacity:0.7;">MEDLENS·AI · BOOT WATCHDOG</div>' +
+            '<h1 style="font-size:24px;margin:10px 0 14px;font-family:Arial,sans-serif;">' + title + "</h1>" +
+            '<p style="font-size:12px;line-height:1.6;opacity:0.85;word-break:break-word;">' + detail + "</p>" +
+            '<button onclick="location.reload(true)" style="margin-top:16px;background:#0e7c72;color:#f5f1e6;border:none;padding:10px 18px;font-family:inherit;font-size:12px;letter-spacing:0.2em;cursor:pointer;">RESTART CONSOLE</button>' +
+            "</div></div>";
+        }
+        /* any error escaping before the app mounts (incl. failed script loads) */
+        window.addEventListener(
+          "error",
+          function (e) {
+            if (document.querySelector("[data-app-mounted]")) return;
+            var src = e.target && e.target.src ? " — failed to load " + e.target.src : "";
+            diag("The console failed to boot.", (e.message || "Unknown error") + src);
+          },
+          true
+        );
+        /* React 18 surfaces some mount failures as async rejections */
+        window.addEventListener("unhandledrejection", function (e) {
+          if (document.querySelector("[data-app-mounted]")) return;
+          var msg = (e.reason && e.reason.message) || String(e.reason);
+          diag("A boot task was rejected.", msg);
+        });
+        /* if nothing has rendered after 8s, the modules never arrived */
+        setTimeout(function () {
+          var root = document.getElementById("root");
+          if (root && !root.hasChildNodes()) {
+            diag(
+              "Boot timed out.",
+              "The application modules never mounted. Hard-reload (Ctrl/Cmd + Shift + R) to clear a stale cache. On the deployed site, a fresh build may still be publishing — wait a minute and retry."
+            );
+          }
+        }, 8000);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -595,8 +595,15 @@ export const TEST_CASES: Case[] = [
     run: async () => {
       const m = await trainModel({ epochs: 24, rowsPerClass: 32 });
       const preds = predictWithModel(m, ["vomiting", "diarrhea", "nausea"]);
-      const ok = preds.length > 0 && preds[0].name === "Gastroenteritis";
-      return { pass: ok, detail: `top=${preds[0]?.name ?? "∅"} @ ${((preds[0]?.prob ?? 0) * 100).toFixed(1)}%` };
+      const top = preds[0];
+      const second = preds[1];
+      const ok = !!top && top.name === "Gastroenteritis";
+      return {
+        pass: ok,
+        detail: ok
+          ? `top=Gastroenteritis @ ${(top.prob * 100).toFixed(1)}% · runner-up ${second.name} @ ${(second.prob * 100).toFixed(1)}%`
+          : `top=${top?.name ?? "∅"} @ ${((top?.prob ?? 0) * 100).toFixed(1)}% — expected Gastroenteritis`,
+      };
     },
   },
 ];

@@ -28,7 +28,7 @@ export const DISEASE_SYMPTOM_MATRIX: DiseaseProfile[] = [
   { disease: "Drug reaction", symptoms: ["skin rash", "nodal skin eruptions", "itching", "stomach pain", "burning micturition", "spotting urination"] },
   { disease: "Peptic ulcer disease", symptoms: ["vomiting", "indigestion", "loss of appetite", "abdominal pain", "passage of gases", "internal itching"] },
   { disease: "Diabetes", symptoms: ["fatigue", "weight loss", "restlessness", "lethargy", "irregular sugar level", "blurred and distorted vision", "increased appetite", "polyuria"] },
-  { disease: "Gastroenteritis", symptoms: ["vomiting", "sunken eyes", "dehydration", "diarrhea"] },
+  { disease: "Gastroenteritis", symptoms: ["vomiting", "diarrhea", "nausea", "sunken eyes", "dehydration"] },
   { disease: "Bronchial asthma", symptoms: ["fatigue", "cough", "high fever", "breathlessness"] },
   { disease: "Hypertension", symptoms: ["headache", "chest pain", "dizziness", "loss of balance", "lack of concentration"] },
   { disease: "Migraine", symptoms: ["acidity", "indigestion", "headache", "blurred and distorted vision", "excessive hunger", "stiff neck", "depression", "irritability", "visual disturbances"] },

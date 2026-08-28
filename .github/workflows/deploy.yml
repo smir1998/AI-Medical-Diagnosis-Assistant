@@ -54,9 +54,8 @@ jobs:
           for wf in .github/workflows/*.yml; do
             [ "$wf" = ".github/workflows/deploy.yml" ] && continue
             if grep -l "environment: github-pages" "$wf" >/dev/null 2>&1 \
-               && grep -l "on:" "$wf" >/dev/null 2>&1 \
                && grep -A3 "^on:" "$wf" | grep -q "push"; then
-              echo "::warning::$wf appears to deploy to github-pages on push — two deployers fight for the same environment. Keep only deploy.yml (or the inert jekyll-gh-pages.yml shipped in this repo)."
+              echo "::warning::$wf appears to deploy to github-pages on push — two deployers fight for the same environment. Keep only deploy.yml."
             fi
           done
 

@@ -7,9 +7,6 @@
 # repo root — producing a blank site even on green runs.
 #
 # The single real deployer is .github/workflows/deploy.yml.
-# If Pages ever serves stale/blank content again, check Settings → Pages →
-# Source is "GitHub Actions", and that no other workflow mentions the
-# "github-pages" environment with a push trigger.
 # ============================================================================
 
 name: Deploy Jekyll with GitHub Pages dependencies preinstalled

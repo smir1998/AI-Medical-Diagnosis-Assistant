@@ -63,12 +63,31 @@
             "</div></div>";
         }
         /* any error escaping before the app mounts (incl. failed script loads) */
+        var retried = false;
         window.addEventListener(
           "error",
           function (e) {
             if (document.querySelector("[data-app-mounted]")) return;
-            var src = e.target && e.target.src ? " — failed to load " + e.target.src : "";
-            diag("The console failed to boot.", (e.message || "Unknown error") + src);
+            var failed = e.target && e.target.tagName === "SCRIPT" && e.target.src ? e.target.src : "";
+            /* Self-heal: a preview's dev server sometimes restarts between
+               sessions, which fails the first module fetch. Re-inject the
+               entry module once with a fresh cache-bust before giving up. */
+            if (failed && !retried) {
+              retried = true;
+              setTimeout(function () {
+                var s = document.createElement("script");
+                s.type = "module";
+                s.src = "/src/main.tsx?reboot=" + Date.now();
+                document.head.appendChild(s);
+              }, 1200);
+              return;
+            }
+            var src = failed ? " — failed to load " + failed : "";
+            diag(
+              "The console failed to boot.",
+              (e.message || "Unknown error") + src +
+                " This usually means the preview's dev-server session restarted — close and reopen the preview, or hard-reload (Ctrl/Cmd + Shift + R)."
+            );
           },
           true
         );
@@ -78,16 +97,26 @@
           var msg = (e.reason && e.reason.message) || String(e.reason);
           diag("A boot task was rejected.", msg);
         });
-        /* if nothing has rendered after 8s, the modules never arrived */
-        setTimeout(function () {
-          var root = document.getElementById("root");
-          if (root && !root.hasChildNodes()) {
-            diag(
-              "Boot timed out.",
-              "The application modules never mounted. Hard-reload (Ctrl/Cmd + Shift + R) to clear a stale cache. On the deployed site, a fresh build may still be publishing — wait a minute and retry."
-            );
-          }
-        }, 8000);
+        /* if nothing has rendered in time, the modules never arrived
+           (grace extends to 14s once the self-heal retry is in flight) */
+        var graceExtended = false;
+        function scheduleBootTimeout(ms) {
+          setTimeout(function () {
+            if (retried && !graceExtended) {
+              graceExtended = true;
+              scheduleBootTimeout(6000); /* +6s grace while the retry loads */
+              return;
+            }
+            var root = document.getElementById("root");
+            if (root && !root.hasChildNodes()) {
+              diag(
+                "Boot timed out.",
+                "The application modules never mounted. Close and reopen the preview, or hard-reload (Ctrl/Cmd + Shift + R) to clear a stale cache. On the deployed site, a fresh build may still be publishing — wait a minute and retry."
+              );
+            }
+          }, ms);
+        }
+        scheduleBootTimeout(8000);
       })();
     </script>
     <script type="module" src="/src/main.tsx"></script>

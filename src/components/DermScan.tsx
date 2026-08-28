@@ -333,7 +333,7 @@ export function DermScan({ onDone, onPipeline }: Props) {
                       alt={s.label}
                       loading="lazy"
                       onError={(e) => {
-                        e.currentTarget.src = NO_SIGNAL_TILE;
+                        if (e.currentTarget.src !== NO_SIGNAL_TILE) e.currentTarget.src = NO_SIGNAL_TILE;
                       }}
                       className="h-14 w-14 shrink-0 border border-ink/20 object-cover"
                     />
@@ -354,7 +354,7 @@ export function DermScan({ onDone, onPipeline }: Props) {
                 src={src.url}
                 alt={src.name}
                 onError={(e) => {
-                  e.currentTarget.src = NO_SIGNAL_TILE;
+                  if (e.currentTarget.src !== NO_SIGNAL_TILE) e.currentTarget.src = NO_SIGNAL_TILE;
                 }}
                 className="mx-auto max-h-[380px] w-auto object-contain"
                 draggable={false}

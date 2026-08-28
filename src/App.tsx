@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
+import { Component, lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { TICKER_ITEMS } from "./data/medical";
 import type { ImageResult, SymptomResult } from "./lib/engine";
 import { nowTime } from "./lib/engine";
-import { TEST_CASES } from "./lib/tests";
 import { StatusBar } from "./components/StatusBar";
 import { SymptomChecker } from "./components/SymptomChecker";
 import { ImageAnalysis } from "./components/ImageAnalysis";
@@ -12,10 +11,70 @@ import { PatientRegistry, type Patient } from "./components/PatientRegistry";
 import { ReportPanel } from "./components/ReportPanel";
 import { HistoryPanel, ModelVitals, PipelinePanel, type HistoryEntry } from "./components/RailPanels";
 import { Evaluation, FieldNotes, InsideModel, ModelRegistry, setLiveMetrics } from "./components/InfoSections";
-import { TrainingGrounds } from "./components/TrainingGrounds";
 import type { TrainedModel } from "./lib/train";
-import { QABench } from "./components/QABench";
 import { CountUp, ECGLine, Icon, Reveal, Scramble, SectionTag, type IconName } from "./components/ui";
+
+/* Heavy module graphs load on demand: the QA bench (which drags in the whole
+   regression battery + trainer) only when opened, the Training Grounds just
+   before they scroll into view. InfoSections stays static — the repo's own
+   tests pin its import/render contract. */
+const TrainingGrounds = lazy(() =>
+  import("./components/TrainingGrounds").then((m) => ({ default: m.TrainingGrounds }))
+);
+const QABench = lazy(() => import("./components/QABench").then((m) => ({ default: m.QABench })));
+
+/* keep in sync with src/lib/tests.ts (the README QA tests assert the same count) */
+const QA_CASE_COUNT = 41;
+
+/* ------------------------------------------------------------------ */
+/*  Fault boundary: a crash in any section renders a readable fault    */
+/*  panel instead of blanking the whole console.                       */
+/* ------------------------------------------------------------------ */
+class FaultBoundary extends Component<{ children: ReactNode }, { err: Error | null }> {
+  state = { err: null as Error | null };
+
+  static getDerivedStateFromError(err: Error) {
+    return { err };
+  }
+
+  render() {
+    if (!this.state.err) return this.props.children;
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
+        <div className="border-2 border-alert bg-paper p-6 shadow-[8px_8px_0_0_rgba(140,47,39,0.55)]">
+          <p className="flex items-center gap-2 font-mono text-[10px] font-bold tracking-[0.28em] text-alert">
+            ⚠ SYSTEM FAULT — SECTION ISOLATED
+          </p>
+          <h2 className="mt-3 font-display text-2xl font-black tracking-tight">
+            A module threw an exception.
+          </h2>
+          <p className="mt-2 break-words font-mono text-xs leading-relaxed text-inksoft">
+            {this.state.err.message}
+          </p>
+          <p className="mt-3 text-sm leading-relaxed text-inksoft">
+            The rest of the console is unaffected. A reload clears transient state; if it persists,
+            clearing this site's local storage resets the persisted registry and logs.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-5 inline-flex items-center gap-2 bg-pine px-5 py-2.5 font-display text-xs font-extrabold uppercase tracking-wider text-paper transition-all duration-200 hover:-translate-y-0.5 hover:bg-teal"
+          >
+            Restart console
+          </button>
+        </div>
+      </div>
+    );
+  }
+}
+
+function ModuleFallback() {
+  return (
+    <div className="grid place-items-center border border-ink/15 bg-paperdeep/50 py-16">
+      <ECGLine className="h-8 w-44 text-teal/70" />
+      <p className="blink-soft mt-2 font-mono text-[10px] tracking-[0.26em] text-inksoft">LOADING MODULE</p>
+    </div>
+  );
+}
 
 type Tab = "symptoms" | "image" | "derm" | "chat";
 
@@ -25,6 +84,44 @@ const TABS: { id: Tab; label: string; icon: IconName; hint: string }[] = [
   { id: "derm", label: "Derm Scan", icon: "scope", hint: "CNN · skin lesions" },
   { id: "chat", label: "NLP Desk", icon: "chat", hint: "medical Q&A" },
 ];
+
+/** Normalizes one persisted patient row; drops structurally broken entries. */
+function sanitizePatient(raw: unknown): Patient | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const p = raw as Partial<Patient> & Record<string, unknown>;
+  if (typeof p.id !== "string" || typeof p.name !== "string" || p.name.trim() === "") return null;
+  const triage = [1, 2, 3, 4, 5].includes(Number(p.triage)) ? (Number(p.triage) as Patient["triage"]) : 3;
+  const v = (typeof p.vitals === "object" && p.vitals !== null ? p.vitals : {}) as Record<string, unknown>;
+  const num = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : undefined);
+  return {
+    id: p.id,
+    name: p.name,
+    age: typeof p.age === "number" ? p.age : 0,
+    sex: p.sex === "M" || p.sex === "F" || p.sex === "X" ? p.sex : "X",
+    complaint: typeof p.complaint === "string" ? p.complaint : "—",
+    allergies: typeof p.allergies === "string" ? p.allergies : "NKDA",
+    triage,
+    vitals: { hr: num(v.hr), sys: num(v.sys), dia: num(v.dia), spo2: num(v.spo2), temp: num(v.temp) },
+    flags: Array.isArray(p.flags) ? p.flags.filter((f): f is string => typeof f === "string") : [],
+    status: p.status === "discharged" ? "discharged" : "admitted",
+    admittedAt: typeof p.admittedAt === "string" ? p.admittedAt : new Date().toISOString(),
+  };
+}
+
+/** Normalizes one persisted session-log row. */
+function sanitizeHistory(raw: unknown): HistoryEntry | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const e = raw as Partial<HistoryEntry>;
+  if (typeof e.id !== "number" || typeof e.title !== "string") return null;
+  const type = e.type === "symptom" || e.type === "image" || e.type === "derm" || e.type === "adm" ? e.type : "symptom";
+  return {
+    id: e.id,
+    time: typeof e.time === "string" ? e.time : "--:--:--",
+    type,
+    title: e.title,
+    confidence: typeof e.confidence === "number" && Number.isFinite(e.confidence) ? e.confidence : -1,
+  };
+}
 
 /**
  * Renders the MedLens diagnostic console for patient management, AI-assisted analysis, and educational model information.
@@ -38,8 +135,10 @@ export default function App() {
   const [history, setHistory] = useState<HistoryEntry[]>(() => {
     try {
       const raw = localStorage.getItem("medlens-history");
-      const parsed = raw ? (JSON.parse(raw) as HistoryEntry[]) : [];
-      return Array.isArray(parsed) ? parsed.slice(0, 12) : [];
+      const parsed = raw ? (JSON.parse(raw) as unknown[]) : [];
+      return Array.isArray(parsed)
+        ? parsed.map(sanitizeHistory).filter((e): e is HistoryEntry => e !== null).slice(0, 12)
+        : [];
     } catch {
       return [];
     }
@@ -56,8 +155,10 @@ export default function App() {
   const [patients, setPatients] = useState<Patient[]>(() => {
     try {
       const raw = localStorage.getItem("medlens-patients");
-      const parsed = raw ? (JSON.parse(raw) as Patient[]) : [];
-      return Array.isArray(parsed) ? parsed.slice(0, 30) : [];
+      const parsed = raw ? (JSON.parse(raw) as unknown[]) : [];
+      return Array.isArray(parsed)
+        ? parsed.map(sanitizePatient).filter((p): p is Patient => p !== null).slice(0, 30)
+        : [];
     } catch {
       return [];
     }
@@ -167,10 +268,15 @@ export default function App() {
   };
 
   return (
-    <div id="top" className="min-h-screen">
+    <div id="top" data-app-mounted className="min-h-screen">
+      <FaultBoundary>
       <div className="noise-overlay" aria-hidden="true" />
       <StatusBar onQA={() => setQaOpen(true)} />
-      {qaOpen && <QABench onClose={() => setQaOpen(false)} />}
+      {qaOpen && (
+        <Suspense fallback={null}>
+          <QABench onClose={() => setQaOpen(false)} />
+        </Suspense>
+      )}
 
       {/* ---------- triage board ---------- */}
       <section className="border-b border-ink/15">
@@ -343,12 +449,23 @@ export default function App() {
 
       <ECGLine className="block h-12 w-full text-teal/70" slow />
 
-      <InsideModel />
-      <Evaluation />
-      <TrainingGrounds onTrained={setTrainedModel} />
-      <Evaluation />
-      <ModelRegistry />
-      <FieldNotes />
+      <div className="cv-auto">
+        <InsideModel />
+      </div>
+      <div className="cv-auto">
+        <Suspense fallback={<ModuleFallback />}>
+          <TrainingGrounds onTrained={setTrainedModel} />
+        </Suspense>
+      </div>
+      <div className="cv-auto">
+        <Evaluation />
+      </div>
+      <div className="cv-auto">
+        <ModelRegistry />
+      </div>
+      <div className="cv-auto">
+        <FieldNotes />
+      </div>
 
       {/* ---------- footer ---------- */}
       <footer className="dark-grid border-t-4 border-alert text-paper">
@@ -384,7 +501,7 @@ export default function App() {
                 onClick={() => setQaOpen(true)}
                 className="group mt-5 inline-flex items-center gap-2 border border-mint/40 bg-mint/10 px-3.5 py-2 font-mono text-[10px] font-bold tracking-[0.2em] text-mint transition-all duration-200 hover:-translate-y-px hover:bg-mint hover:text-pine"
               >
-                <Icon name="check" className="h-3 w-3" /> RUN QA BENCH · {TEST_CASES.length} CASES
+                <Icon name="check" className="h-3 w-3" /> RUN QA BENCH · {QA_CASE_COUNT} CASES
               </button>
               <p className="mt-5 font-mono text-[10px] leading-relaxed tracking-wider text-paper/40">
                 MEDLENS·AI — DEEP LEARNING IN HEALTH CARE
@@ -399,6 +516,7 @@ export default function App() {
           </div>
         </div>
       </footer>
+      </FaultBoundary>
     </div>
   );
 }

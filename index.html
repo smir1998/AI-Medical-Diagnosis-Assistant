@@ -12,7 +12,7 @@
     <meta property="og:title" content="MedLens · AI Medical Diagnosis Assistant" />
     <meta
       property="og:description"
-      content="Deep Learning in Health Care — patient intake, symptom differentials, chest X-ray CNN, dermoscopy screening, NLP desk, auto-reports and a 20-case QA bench."
+      content="Deep Learning in Health Care — patient intake, symptom differentials, chest X-ray CNN, dermoscopy screening, NLP desk, auto-reports and a 41-case QA bench."
     />
     <meta property="og:url" content="https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/" />
     <meta
@@ -39,9 +39,16 @@
   <body>
     <div id="root"></div>
     <!--
-      Inline boot watchdog — plain JS that runs BEFORE any module loads.
-      If the module graph fails (missing file, blocked script, stale cache)
-      main.tsx never executes, so only an inline script can report it.
+      Boot watchdog — plain JS that runs BEFORE any module loads, in three
+      escalating stages:
+        stage 0 → dev entry (/src/main.tsx) fails  → retry it once, cache-busted
+        stage 1 → retry also fails                 → load the COMPILED bundle
+                                                     from /dist/ via the Vite
+                                                     manifest (no dev server
+                                                     required — static files)
+        stage 2 → compiled bundle unreachable      → readable diagnostic
+      A dead preview dev-server session therefore self-heals instead of
+      producing a blank or error page.
     -->
     <script>
       (function () {
@@ -62,61 +69,108 @@
             '<button onclick="location.reload(true)" style="margin-top:16px;background:#0e7c72;color:#f5f1e6;border:none;padding:10px 18px;font-family:inherit;font-size:12px;letter-spacing:0.2em;cursor:pointer;">RESTART CONSOLE</button>' +
             "</div></div>";
         }
-        /* any error escaping before the app mounts (incl. failed script loads) */
-        var retried = false;
+
+        var stage = 0;
+
+        /* Stage 2: serve the app from the compiled, static bundle in /dist/. */
+        function loadCompiledBundle() {
+          fetch("/dist/.vite/manifest.json", { cache: "no-store" })
+            .then(function (r) {
+              if (!r.ok) throw new Error("manifest " + r.status);
+              return r.json();
+            })
+            .then(function (manifest) {
+              /* entry key varies by Vite version ("index.html" vs the source
+                 path) — find whichever chunk is flagged isEntry */
+              var entry = null;
+              for (var key in manifest) {
+                if (manifest[key] && manifest[key].isEntry) {
+                  entry = manifest[key];
+                  break;
+                }
+              }
+              if (!entry || !entry.file) throw new Error("entry missing from manifest");
+              (entry.css || []).forEach(function (c) {
+                var link = document.createElement("link");
+                link.rel = "stylesheet";
+                link.href = "/dist/" + c;
+                document.head.appendChild(link);
+              });
+              var s = document.createElement("script");
+              s.type = "module";
+              s.src = "/dist/" + entry.file;
+              document.head.appendChild(s);
+            })
+            .catch(function (err) {
+              diag(
+                "The console failed to boot.",
+                "Both the live dev modules and the compiled bundle were unreachable (" +
+                  (err && err.message ? err.message : "unknown") +
+                  "). Close and reopen the preview, or hard-reload (Ctrl/Cmd + Shift + R) to clear a stale cache."
+              );
+            });
+        }
+
+        /* any error escaping before the app mounts escalates the fallback chain */
         window.addEventListener(
           "error",
           function (e) {
-            if (document.querySelector("[data-app-mounted]")) return;
-            var failed = e.target && e.target.tagName === "SCRIPT" && e.target.src ? e.target.src : "";
-            /* Self-heal: a preview's dev server sometimes restarts between
-               sessions, which fails the first module fetch. Re-inject the
-               entry module once with a fresh cache-bust before giving up. */
-            if (failed && !retried) {
-              retried = true;
+            if (document.querySelector("[data-app-mounted]") || document.querySelector("[data-fatal]")) return;
+            if (stage === 0) {
+              stage = 1;
               setTimeout(function () {
                 var s = document.createElement("script");
                 s.type = "module";
                 s.src = "/src/main.tsx?reboot=" + Date.now();
                 document.head.appendChild(s);
-              }, 1200);
+              }, 900);
               return;
             }
-            var src = failed ? " — failed to load " + failed : "";
+            if (stage === 1) {
+              stage = 2;
+              loadCompiledBundle();
+              return;
+            }
+            var src = e.target && e.target.src ? " — failed to load " + e.target.src : "";
             diag(
               "The console failed to boot.",
               (e.message || "Unknown error") + src +
-                " This usually means the preview's dev-server session restarted — close and reopen the preview, or hard-reload (Ctrl/Cmd + Shift + R)."
+                " The dev server and the compiled bundle are both unreachable — close and reopen the preview, or hard-reload (Ctrl/Cmd + Shift + R)."
             );
           },
           true
         );
+
         /* React 18 surfaces some mount failures as async rejections */
         window.addEventListener("unhandledrejection", function (e) {
-          if (document.querySelector("[data-app-mounted]")) return;
+          if (document.querySelector("[data-app-mounted]") || document.querySelector("[data-fatal]")) return;
           var msg = (e.reason && e.reason.message) || String(e.reason);
           diag("A boot task was rejected.", msg);
         });
-        /* if nothing has rendered in time, the modules never arrived
-           (grace extends to 14s once the self-heal retry is in flight) */
+
+        /* boot timeout — if the app never mounted, jump straight to the bundle */
         var graceExtended = false;
         function scheduleBootTimeout(ms) {
           setTimeout(function () {
-            if (retried && !graceExtended) {
-              graceExtended = true;
-              scheduleBootTimeout(6000); /* +6s grace while the retry loads */
-              return;
-            }
+            if (document.querySelector("[data-app-mounted]") || document.querySelector("[data-fatal]")) return;
             var root = document.getElementById("root");
-            if (root && !root.hasChildNodes()) {
-              diag(
-                "Boot timed out.",
-                "The application modules never mounted. Close and reopen the preview, or hard-reload (Ctrl/Cmd + Shift + R) to clear a stale cache. On the deployed site, a fresh build may still be publishing — wait a minute and retry."
-              );
+            if (root && root.hasChildNodes()) return;
+            if (stage < 2) {
+              stage = 2;
+              loadCompiledBundle();
+              if (!graceExtended) {
+                graceExtended = true;
+                scheduleBootTimeout(8000);
+                return;
+              }
             }
+            diag(
+              "Boot timed out.",
+              "The application modules never mounted. Close and reopen the preview, or hard-reload (Ctrl/Cmd + Shift + R) to clear a stale cache. On the deployed site, a fresh build may still be publishing — wait a minute and retry."
+            );
           }, ms);
         }
-        scheduleBootTimeout(8000);
+        scheduleBootTimeout(7000);
       })();
     </script>
     <script type="module" src="/src/main.tsx"></script>

@@ -49,16 +49,6 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Detect competing Pages deployers
-        run: |
-          for wf in .github/workflows/*.yml; do
-            [ "$wf" = ".github/workflows/deploy.yml" ] && continue
-            if grep -l "environment: github-pages" "$wf" >/dev/null 2>&1 \
-               && grep -A3 "^on:" "$wf" | grep -q "push"; then
-              echo "::warning::$wf appears to deploy to github-pages on push — two deployers fight for the same environment. Keep only deploy.yml."
-            fi
-          done
-
       - name: Verify GitHub Pages is enabled
         run: |
           status=$(curl -s -o /dev/null -w "%{http_code}" \

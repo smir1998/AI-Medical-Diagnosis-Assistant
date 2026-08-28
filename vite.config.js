@@ -8,6 +8,9 @@ export default defineConfig({
   base: "./",
   plugins: [react(), tailwindcss()],
   build: {
+    /* manifest powers the index.html boot-watchdog fallback: when the dev
+       server is offline, the page loads the compiled bundle from /dist/ */
+    manifest: true,
     /* react/react-dom split into their own cacheable vendor chunk;
        the transformers.js chunk is lazy by design, so 500KB warnings are noise */
     chunkSizeWarningLimit: 700,

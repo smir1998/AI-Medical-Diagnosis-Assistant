@@ -105,10 +105,14 @@ export const TEST_CASES: Case[] = [
     run: () => {
       const r = analyzeSymptoms(["fever", "cough", "muscle_aches", "fatigue", "chills"], 1, 7);
       const top = r.scored[0];
-      const ok = top.disease.id === "influenza" && top.confidence > 20 && r.redFlags.length === 0;
+      const ok =
+        top.disease.id === "influenza" &&
+        top.confidence > 20 &&
+        r.redFlags.length === 0 &&
+        r.redFlagSymptoms.length === 0;
       return {
         pass: ok,
-        detail: `top=${top.disease.name} @ ${top.confidence.toFixed(1)}% · flags=${r.redFlags.length}`,
+        detail: `top=${top.disease.name} @ ${top.confidence.toFixed(1)}% · flags=0 · flagged-symptoms=0`,
       };
     },
   },
@@ -119,8 +123,11 @@ export const TEST_CASES: Case[] = [
     run: () => {
       const r = analyzeSymptoms(["chest_pain", "shortness_breath"], 2, 8);
       const cardiac = r.redFlags.some((f) => f.toLowerCase().includes("cardiac"));
-      const ok = r.redFlags.length >= 2 && cardiac;
-      return { pass: ok, detail: `flags=${r.redFlags.length} · cardiac-note=${cardiac ? "yes" : "no"}` };
+      const ok = r.redFlagSymptoms.length >= 2 && cardiac;
+      return {
+        pass: ok,
+        detail: `flagged=[${r.redFlagSymptoms.join(", ")}] · cardiac-note=${cardiac ? "yes" : "no"}`,
+      };
     },
   },
   {

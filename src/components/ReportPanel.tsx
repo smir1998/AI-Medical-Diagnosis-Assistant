@@ -145,12 +145,18 @@ export function ReportPanel({ symptom, image, derm, patient }: Props) {
                     ({symptom.scored[1].confidence.toFixed(1)}%)
                   </p>
                 )}
-                {symptom.redFlags.length > 0 && (
+                {(symptom.redFlagSymptoms.length > 0 || symptom.redFlags.length > 0) && (
                   <div className="mt-2 border border-alert/50 bg-alert/10 p-2.5 text-alertdeep">
                     <p className="mb-1 font-bold tracking-widest text-alert">⚠ RED FLAGS</p>
+                    {symptom.redFlagSymptoms.length > 0 && (
+                      <p className="font-bold uppercase tracking-wider">{symptom.redFlagSymptoms.join(" · ")}</p>
+                    )}
                     {symptom.redFlags.map((f) => (
                       <p key={f}>• {f}</p>
                     ))}
+                    <p className="mt-1.5 border-l-2 border-alert bg-paper px-2 py-1 font-bold tracking-wide">
+                      DO NOT RELY ON AN AI ESTIMATE FOR IT.
+                    </p>
                   </div>
                 )}
               </div>

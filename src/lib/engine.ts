@@ -35,6 +35,9 @@ export interface ScoredDisease {
 
 export interface SymptomResult {
   scored: ScoredDisease[];
+  /** Labels of individually flagged red-flag symptoms (no sentence boilerplate). */
+  redFlagSymptoms: string[];
+  /** Clinical combination notes only (e.g. meningitis triad, cardiac pairing). */
   redFlags: string[];
   meta: {
     symptomLabels: string[];
@@ -72,13 +75,14 @@ export function analyzeSymptoms(
     };
   });
 
-  const redFlags: string[] = [];
+  const redFlagSymptoms: string[] = [];
   for (const id of selectedIds) {
     if (RED_FLAG_SINGLE.includes(id)) {
       const label = SYMPTOMS.find((s) => s.id === id)?.label ?? id;
-      redFlags.push(`${label} is a red-flag symptom — do not rely on an AI estimate for it.`);
+      redFlagSymptoms.push(label);
     }
   }
+  const redFlags: string[] = [];
   for (const combo of RED_FLAG_COMBOS) {
     if (combo.ids.every((id) => selectedIds.includes(id))) redFlags.push(combo.note);
   }
@@ -87,6 +91,7 @@ export function analyzeSymptoms(
 
   return {
     scored,
+    redFlagSymptoms: [...new Set(redFlagSymptoms)],
     redFlags: [...new Set(redFlags)].slice(0, 4),
     meta: {
       symptomLabels: selectedIds.map((id) => SYMPTOMS.find((s) => s.id === id)?.label ?? id),

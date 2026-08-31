@@ -6,6 +6,8 @@
 import { analyzeSymptoms, predictImage, prefersReducedMotion } from "./engine";
 import { cosineSim } from "./semantic";
 import { predictWithModel, trainModel } from "./train";
+import { encountersFor, type EncounterEntry } from "./encounters";
+import { buildReportPlan } from "./pdf";
 import { NB_MODEL, nbPosteriors } from "./naiveBayes";
 import { opacityToPneumonia, radiographStats } from "./pixel";
 import { TRAINING_ROWS } from "../data/training";
@@ -57,7 +59,9 @@ interface Case {
     | "PIXEL HEAD"
     | "TRAINED MODEL"
     | "BUNDLE"
-    | "LIVE TRAINER";
+    | "LIVE TRAINER"
+    | "ENCOUNTER"
+    | "PDF PLAN";
   name: string;
   run: Run;
 }
@@ -605,12 +609,69 @@ export const TEST_CASES: Case[] = [
       const top = preds[0];
       const second = preds[1];
       const ok = !!top && top.name === "Gastroenteritis";
+      void second;
       return {
         pass: ok,
         detail: ok
           ? `top=Gastroenteritis @ ${(top.prob * 100).toFixed(1)}% · runner-up ${second.name} @ ${(second.prob * 100).toFixed(1)}%`
           : `top=${top?.name ?? "∅"} @ ${((top?.prob ?? 0) * 100).toFixed(1)}% — expected Gastroenteritis`,
       };
+    },
+  },
+
+  /* ----- E · encounter trail ----- */
+  {
+    id: "E1",
+    suite: "ENCOUNTER",
+    name: "Encounter trail: only entries stamped with the chart's MRN are returned",
+    run: () => {
+      const history: EncounterEntry[] = [
+        { id: 1, time: "10:00:00", type: "adm", title: "Admit", confidence: -1, mrn: "MRN-AAA" },
+        { id: 2, time: "10:02:11", type: "symptom", title: "Influenza", confidence: 61.2, mrn: "MRN-AAA" },
+        { id: 3, time: "10:05:47", type: "image", title: "Chest X-ray", confidence: 92.4, mrn: "MRN-BBB" },
+        { id: 4, time: "10:07:03", type: "derm", title: "Derm scan", confidence: 88.0 },
+      ];
+      const trail = encountersFor(history, "MRN-AAA");
+      const ok = trail.length === 2 && trail.every((e) => e.mrn === "MRN-AAA");
+      return { pass: ok, detail: `trail=${trail.length} entries (expected 2, unstamped excluded)` };
+    },
+  },
+
+  /* ----- PD · PDF plan ----- */
+  {
+    id: "PD1",
+    suite: "PDF PLAN",
+    name: "Report plan: patient block, deterministic file name, disclaimer always present",
+    run: () => {
+      const { patient } = validateIntake(intakeDraft());
+      if (!patient) return { pass: false, detail: "could not build patient" };
+      const plan = buildReportPlan(null, null, null, patient, "PT-TEST-42");
+      const hasPatient = plan.lines.some((l) => l.kind === "kv" && l.k === "MRN" && l.v === patient.id);
+      const hasDisclaimer = plan.lines.some(
+        (l) => l.kind === "alert" && l.text.includes("NOT a clinical diagnosis")
+      );
+      const ok =
+        plan.reportId === "PT-TEST-42" &&
+        plan.fileName === "MedLens-PT-TEST-42.pdf" &&
+        hasPatient &&
+        hasDisclaimer;
+      return {
+        pass: ok,
+        detail: `id=${plan.reportId} · lines=${plan.lines.length} · patient+disclaimer=${hasPatient && hasDisclaimer}`,
+      };
+    },
+  },
+  {
+    id: "PD2",
+    suite: "PDF PLAN",
+    name: "Plan is deterministic: same inputs ⇒ identical file name and line sequence",
+    run: () => {
+      const { patient } = validateIntake(intakeDraft());
+      const a = buildReportPlan(null, null, null, patient ?? null, "PT-SAME-1");
+      const b = buildReportPlan(null, null, null, patient ?? null, "PT-SAME-1");
+      const sameLines = JSON.stringify(a.lines) === JSON.stringify(b.lines);
+      const ok = a.fileName === b.fileName && sameLines;
+      return { pass: ok, detail: `fileName=${a.fileName} · lines-identical=${sameLines}` };
     },
   },
 ];

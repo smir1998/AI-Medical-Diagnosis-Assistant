@@ -1,0 +1,20 @@
+{
+  "name": "MedLens·AI — Medical Diagnosis Assistant",
+  "short_name": "MedLens",
+  "description": "Deep Learning in Health Care — an educational AI triage console: patient registrar, symptom differentials, chest X-ray CNN, dermoscopy screening, NLP desk and a 44-case QA bench.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b2f2c",
+  "theme_color": "#0b2f2c",
+  "categories": ["education", "medical", "productivity"],
+  "icons": [
+    {
+      "src": "./og-banner.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

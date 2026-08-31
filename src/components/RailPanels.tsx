@@ -107,6 +107,7 @@ export interface HistoryEntry {
   type: "symptom" | "image" | "derm" | "adm";
   title: string;
   confidence: number; // -1 → not applicable (e.g. admissions)
+  mrn?: string; // the chart on record when the run happened
 }
 
 export function HistoryPanel({ entries }: { entries: HistoryEntry[] }) {
@@ -157,6 +158,11 @@ export function HistoryPanel({ entries }: { entries: HistoryEntry[] }) {
                       : e.type === "adm"
                         ? "REGISTRAR"
                         : "NLP-SYMPTOMS"}
+                  {e.mrn && (
+                    <span className="ml-1.5 border border-teal/40 bg-teal/10 px-1 py-px font-bold text-teal">
+                      {e.mrn}
+                    </span>
+                  )}
                 </span>
               </span>
               <span className="font-mono text-[11px] font-bold tabular-nums text-teal">

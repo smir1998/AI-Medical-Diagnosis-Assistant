@@ -42,7 +42,7 @@ jobs:
         with:
           path: dist
 
-      - name: Snapshot build for debugging
+      - name: Upload dist snapshot (debug artifact)
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -50,6 +50,7 @@ jobs:
           path: dist
           retention-days: 7
           if-no-files-found: ignore
+          overwrite: true
 
   deploy:
     needs: build
@@ -62,7 +63,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           sparse-checkout: .github
-          sparse-checkout-cone-mode: false
 
       - name: Detect competing Pages deployers
         run: |
@@ -70,7 +70,7 @@ jobs:
             [ "$wf" = ".github/workflows/deploy.yml" ] && continue
             if grep -l "environment: github-pages" "$wf" >/dev/null 2>&1 \
                && grep -A3 "^on:" "$wf" | grep -q "push"; then
-              echo "::warning::$wf appears to deploy to github-pages on push — two deployers fight for the same environment. Keep only deploy.yml."
+              echo "::warning::$wf appears to deploy to github-pages on push — two deployers fight for the same environment. Keep only deploy.yml (or the inert jekyll-gh-pages.yml shipped in this repo)."
             fi
           done
 
@@ -97,7 +97,8 @@ jobs:
 
       - name: Deployment summary
         run: |
-          echo "## ✅ Deployed" >> "$GITHUB_STEP_SUMMARY"
+          echo "### ✅ Deployed to GitHub Pages" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- **URL:** ${{ steps.deployment.outputs.page_url }}" >> "$GITHUB_STEP_SUMMARY"
           echo "- **Commit:** \`${GITHUB_SHA:0:7}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Debug snapshot:** available as the \`dist-snapshot\` artifact on this run" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Artifact snapshot:** available under this run's artifacts as \`dist-snapshot\` (7-day retention)" >> "$GITHUB_STEP_SUMMARY"

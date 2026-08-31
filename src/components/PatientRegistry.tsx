@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { encountersFor, ENCOUNTER_TYPE_LABEL, type EncounterEntry } from "../lib/encounters";
 import { Icon, SectionTag } from "./ui";
 
 /* ------------------------------------------------------------------ */
@@ -166,15 +167,17 @@ export function toCSV(rows: Patient[]): string {
 interface Props {
   patients: Patient[];
   activeId: string | null;
+  history: EncounterEntry[];
   onAdmit: (p: Patient) => void;
   onActivate: (id: string | null) => void;
   onDischarge: (id: string) => void;
   onRemove: (id: string) => void;
 }
 
-export function PatientRegistry({ patients, activeId, onAdmit, onActivate, onDischarge, onRemove }: Props) {
+export function PatientRegistry({ patients, activeId, history, onAdmit, onActivate, onDischarge, onRemove }: Props) {
   const [draft, setDraft] = useState<IntakeDraft>(EMPTY);
   const [errors, setErrors] = useState<DraftError>({});
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const set = <K extends keyof IntakeDraft>(k: K, v: IntakeDraft[K]) =>
     setDraft((d) => ({ ...d, [k]: v }));
@@ -434,6 +437,25 @@ export function PatientRegistry({ patients, activeId, onAdmit, onActivate, onDis
                       <p className="mt-0.5 truncate text-xs text-inksoft">
                         CC: <span className="text-ink">{p.complaint}</span> · Allergies: {p.allergies}
                       </p>
+                      {(() => {
+                        const enc = encountersFor(history, p.id).filter((e) => e.type !== "adm");
+                        const open = expandedId === p.id;
+                        return enc.length > 0 ? (
+                          <button
+                            onClick={() => setExpandedId(open ? null : p.id)}
+                            aria-expanded={open}
+                            className={`mt-1 inline-flex items-center gap-1.5 border px-1.5 py-0.5 font-mono text-[8px] font-bold tracking-widest transition-all duration-150 hover:-translate-y-px ${
+                              open
+                                ? "border-ink bg-ink text-paper"
+                                : "border-teal/45 bg-teal/10 text-teal hover:bg-teal hover:text-paper"
+                            }`}
+                          >
+                            <Icon name="clock" className="h-2.5 w-2.5" />
+                            {enc.length} ENCOUNTER{enc.length > 1 ? "S" : ""}
+                            <span className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`}>▾</span>
+                          </button>
+                        ) : null;
+                      })()}
                       <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[9px] text-inksoft/80">
                         <span>
                           {p.age}y {p.sex} · adm {p.admittedAt}
@@ -491,6 +513,42 @@ export function PatientRegistry({ patients, activeId, onAdmit, onActivate, onDis
                       >
                         <Icon name="x" className="h-3 w-3" />
                       </button>
+                    </div>
+                  </div>
+
+                  {/* encounter trail — every lab run recorded while this chart was active */}
+                  <div
+                    className="grid transition-[grid-template-rows] duration-300 ease-out"
+                    style={{ gridTemplateRows: expandedId === p.id ? "1fr" : "0fr" }}
+                  >
+                    <div className="overflow-hidden">
+                      <div className="mt-2.5 border border-dashed border-teal/40 bg-paperdeep/50 px-3 py-2.5">
+                        <p className="mb-1.5 font-mono text-[8px] font-bold tracking-[0.22em] text-teal">
+                          ── ENCOUNTER TRAIL · {p.id}
+                        </p>
+                        <ol className="space-y-1">
+                          {encountersFor(history, p.id).map((e) => (
+                            <li
+                              key={e.id}
+                              className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5 font-mono text-[10px] leading-relaxed"
+                            >
+                              <span className="tabular-nums text-inksoft">{e.time}</span>
+                              <span className="border border-ink/20 bg-paper px-1 py-px text-[8px] font-bold tracking-widest text-inksoft">
+                                {ENCOUNTER_TYPE_LABEL[e.type]}
+                              </span>
+                              <span className="min-w-0 flex-1 truncate font-semibold text-ink">{e.title}</span>
+                              {e.confidence >= 0 && (
+                                <span className="font-bold tabular-nums text-teal">{e.confidence.toFixed(1)}%</span>
+                              )}
+                            </li>
+                          ))}
+                        </ol>
+                        {encountersFor(history, p.id).length === 0 && (
+                          <p className="font-mono text-[10px] text-inksoft/60">
+                            admission only — run a lab while this chart is active to build the trail
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </li>

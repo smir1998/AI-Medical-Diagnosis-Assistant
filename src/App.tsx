@@ -449,23 +449,13 @@ export default function App() {
 
       <ECGLine className="block h-12 w-full text-teal/70" slow />
 
-      <div className="cv-auto">
-        <InsideModel />
-      </div>
-      <div className="cv-auto">
-        <Suspense fallback={<ModuleFallback />}>
-          <TrainingGrounds onTrained={setTrainedModel} />
-        </Suspense>
-      </div>
-      <div className="cv-auto">
-        <Evaluation />
-      </div>
-      <div className="cv-auto">
-        <ModelRegistry />
-      </div>
-      <div className="cv-auto">
-        <FieldNotes />
-      </div>
+      <InsideModel />
+      <Suspense fallback={<ModuleFallback />}>
+        <TrainingGrounds onTrained={setTrainedModel} />
+      </Suspense>
+      <Evaluation />
+      <ModelRegistry />
+      <FieldNotes />
 
       {/* ---------- footer ---------- */}
       <footer className="dark-grid border-t-4 border-alert text-paper">

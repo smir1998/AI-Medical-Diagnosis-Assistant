@@ -31,13 +31,6 @@ jobs:
         with:
           node-version: 22
 
-      - name: Cache npm dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: npm-${{ runner.os }}-
-
       - name: Install (lockfile optional)
         run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
 
@@ -49,13 +42,13 @@ jobs:
         with:
           path: dist
 
-      - name: Attach dist snapshot (for debugging)
+      - name: Keep build snapshot for debugging
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: dist-snapshot
           path: dist
           retention-days: 7
-          if-no-files-found: error
 
   deploy:
     needs: build
@@ -64,10 +57,10 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout (workflow files only)
+      - name: Checkout (workflows only)
         uses: actions/checkout@v4
         with:
-          sparse-checkout: .github
+          sparse-checkout: .github/workflows
 
       - name: Detect competing Pages deployers
         run: |
@@ -102,7 +95,7 @@ jobs:
 
       - name: Deployment summary
         run: |
-          echo "### ✅ Deployed" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **URL:** ${{ steps.deployment.outputs.page_url }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Commit:** \`${GITHUB_SHA:0:7}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Debug bundle:** Actions → this run → Artifacts → \`dist-snapshot\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "### ✅ Deployed to GitHub Pages" >> "$GITHUB_STEP_SUMMARY"
+          echo "- URL: ${{ steps.deployment.outputs.page_url }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: \`${GITHUB_SHA::7}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Snapshot artifact: **dist-snapshot** (7-day retention)" >> "$GITHUB_STEP_SUMMARY"

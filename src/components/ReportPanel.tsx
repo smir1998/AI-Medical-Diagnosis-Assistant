@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { ImageResult, SymptomResult } from "../lib/engine";
 import type { DermResult } from "./DermScan";
 import type { Patient } from "./PatientRegistry";
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export function ReportPanel({ symptom, image, derm, patient }: Props) {
+  const [pdfState, setPdfState] = useState<"idle" | "busy" | "saved">("idle");
   if (!symptom && !image && !derm) return null;
 
   const top = symptom?.scored[0];
@@ -23,6 +25,21 @@ export function ReportPanel({ symptom, image, derm, patient }: Props) {
   const reportId = `PT-${new Date().toISOString().slice(0, 10).replace(/-/g, "").slice(2)}-${(
     symptom?.meta.runId ?? image?.runId ?? (derm ? `DS-${derm.time.replace(/:/g, "")}` : "0000")
   )}`;
+
+  /* true PDF export — jsPDF is lazy-loaded on first click */
+  const downloadPdf = async () => {
+    if (pdfState === "busy") return;
+    setPdfState("busy");
+    try {
+      const { buildReportPlan, downloadReportPdf } = await import("../lib/pdf");
+      const plan = buildReportPlan(symptom, image, derm ?? null, patient ?? null, reportId);
+      await downloadReportPdf(plan);
+      setPdfState("saved");
+      window.setTimeout(() => setPdfState("idle"), 1800);
+    } catch {
+      setPdfState("idle");
+    }
+  };
 
   const vitalParts = patient
     ? [
@@ -41,12 +58,38 @@ export function ReportPanel({ symptom, image, derm, patient }: Props) {
         <h2 className="font-display text-2xl font-black tracking-tight">
           Patient analysis report<span className="text-alert">.</span>
         </h2>
-        <button
-          onClick={() => window.print()}
-          className="group inline-flex items-center gap-2 border-2 border-ink bg-paper px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider transition-all duration-200 hover:-translate-y-0.5 hover:bg-ink hover:text-paper hover:shadow-[4px_4px_0_0_rgba(14,124,114,0.9)]"
-        >
-          <Icon name="print" className="h-4 w-4" /> Print / PDF
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={downloadPdf}
+            disabled={pdfState === "busy"}
+            className={`inline-flex items-center gap-2 border-2 px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
+              pdfState === "saved"
+                ? "border-teal bg-teal text-paper"
+                : "border-teal bg-teal/10 text-teal hover:-translate-y-0.5 hover:bg-teal hover:text-paper hover:shadow-[4px_4px_0_0_rgba(11,47,45,0.9)]"
+            } disabled:opacity-60`}
+          >
+            {pdfState === "busy" ? (
+              <>
+                <Icon name="layers" className="h-4 w-4 spin-slow" /> Composing…
+              </>
+            ) : pdfState === "saved" ? (
+              <>
+                <Icon name="check" className="h-4 w-4" /> Saved
+              </>
+            ) : (
+              <>
+                <Icon name="report" className="h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5" />
+                Download PDF
+              </>
+            )}
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="group inline-flex items-center gap-2 border-2 border-ink bg-paper px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider transition-all duration-200 hover:-translate-y-0.5 hover:bg-ink hover:text-paper hover:shadow-[4px_4px_0_0_rgba(14,124,114,0.9)]"
+          >
+            <Icon name="print" className="h-4 w-4" /> Print
+          </button>
+        </div>
       </div>
 
       <div className="report-card border-2 border-ink bg-paper shadow-[9px_9px_0_0_rgba(12,43,43,0.9)]">
@@ -145,12 +188,18 @@ export function ReportPanel({ symptom, image, derm, patient }: Props) {
                     ({symptom.scored[1].confidence.toFixed(1)}%)
                   </p>
                 )}
-                {symptom.redFlags.length > 0 && (
+                {(symptom.redFlagSymptoms.length > 0 || symptom.redFlags.length > 0) && (
                   <div className="mt-2 border border-alert/50 bg-alert/10 p-2.5 text-alertdeep">
                     <p className="mb-1 font-bold tracking-widest text-alert">⚠ RED FLAGS</p>
+                    {symptom.redFlagSymptoms.length > 0 && (
+                      <p className="font-bold uppercase tracking-wider">{symptom.redFlagSymptoms.join(" · ")}</p>
+                    )}
                     {symptom.redFlags.map((f) => (
                       <p key={f}>• {f}</p>
                     ))}
+                    <p className="mt-1.5 border-l-2 border-alert bg-paper px-2 py-1 font-bold tracking-wide">
+                      DO NOT RELY ON AN AI ESTIMATE FOR IT.
+                    </p>
                   </div>
                 )}
               </div>

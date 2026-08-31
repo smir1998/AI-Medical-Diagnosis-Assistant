@@ -12,7 +12,7 @@
     <meta property="og:title" content="MedLens · AI Medical Diagnosis Assistant" />
     <meta
       property="og:description"
-      content="Deep Learning in Health Care — patient intake, symptom differentials, chest X-ray CNN, dermoscopy screening, NLP desk, auto-reports and a 41-case QA bench."
+      content="Deep Learning in Health Care — patient intake with encounter history, symptom differentials, chest X-ray CNN, dermoscopy screening, NLP desk, true PDF reports and a 44-case QA bench."
     />
     <meta property="og:url" content="https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/" />
     <meta
@@ -25,6 +25,8 @@
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' fill='%230b2f2c'/%3E%3Cpath d='M10 4h4v6h6v4h-6v6h-4v-6H4v-4h6z' fill='%238fe3cf'/%3E%3C/svg%3E"
     />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./og-banner.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Semantic Engine pulls weights from the HF Hub — warm the connection early -->
@@ -78,6 +80,42 @@
         }
 
         var stage = 0;
+        var cssInjected = false;
+
+        /* entry key varies by Vite version ("index.html" vs the source
+           path) — find whichever chunk is flagged isEntry */
+        function entryFromManifest(manifest) {
+          for (var key in manifest) {
+            if (manifest[key] && manifest[key].isEntry) return manifest[key];
+          }
+          return null;
+        }
+
+        /* Recover styles from the compiled bundle. A failed stylesheet is NOT
+           fatal — the app can still mount, it would just render unformatted. */
+        function injectCompiledCss() {
+          if (cssInjected) return Promise.resolve();
+          cssInjected = true;
+          return fetch("/dist/.vite/manifest.json", { cache: "no-store" })
+            .then(function (r) {
+              if (!r.ok) throw new Error("manifest " + r.status);
+              return r.json();
+            })
+            .then(function (manifest) {
+              var entry = entryFromManifest(manifest);
+              if (!entry) throw new Error("entry missing from manifest");
+              (entry.css || []).forEach(function (c) {
+                var link = document.createElement("link");
+                link.rel = "stylesheet";
+                link.href = "/dist/" + c;
+                document.head.appendChild(link);
+              });
+            })
+            .catch(function (err) {
+              cssInjected = false; /* transient — allow a later retry */
+              throw err;
+            });
+        }
 
         /* Stage 2: serve the app from the compiled, static bundle in /dist/. */
         function loadCompiledBundle() {
@@ -87,22 +125,17 @@
               return r.json();
             })
             .then(function (manifest) {
-              /* entry key varies by Vite version ("index.html" vs the source
-                 path) — find whichever chunk is flagged isEntry */
-              var entry = null;
-              for (var key in manifest) {
-                if (manifest[key] && manifest[key].isEntry) {
-                  entry = manifest[key];
-                  break;
-                }
-              }
+              var entry = entryFromManifest(manifest);
               if (!entry || !entry.file) throw new Error("entry missing from manifest");
-              (entry.css || []).forEach(function (c) {
-                var link = document.createElement("link");
-                link.rel = "stylesheet";
-                link.href = "/dist/" + c;
-                document.head.appendChild(link);
-              });
+              if (!cssInjected) {
+                cssInjected = true;
+                (entry.css || []).forEach(function (c) {
+                  var link = document.createElement("link");
+                  link.rel = "stylesheet";
+                  link.href = "/dist/" + c;
+                  document.head.appendChild(link);
+                });
+              }
               var s = document.createElement("script");
               s.type = "module";
               s.src = "/dist/" + entry.file;
@@ -130,6 +163,14 @@
         window.addEventListener(
           "error",
           function (e) {
+            var t = e.target;
+            /* A failed stylesheet must never blank or scramble the page —
+               the app may mount fine, just unformatted. Recover the compiled
+               CSS from the manifest and let the boot chain continue. */
+            if (t && t.tagName === "LINK" && (t.rel === "stylesheet" || (t.href || "").indexOf(".css") !== -1)) {
+              injectCompiledCss().catch(function () {});
+              return;
+            }
             if (appOwnsPage()) return;
             if (stage === 0) {
               stage = 1;

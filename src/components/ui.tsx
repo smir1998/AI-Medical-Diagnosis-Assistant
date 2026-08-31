@@ -63,7 +63,10 @@ export function Reveal({
 
 /* ---------- scramble-decode title ---------- */
 
-const GLYPHS = "▓▒░#%+X01△▽";
+/* ASCII-only: block glyphs (▓▒░) are missing from Archivo/IBM Plex and
+   render as tofu boxes — the headline looked "scrambled" on systems
+   without fallback coverage. */
+const GLYPHS = "#%+*<>/=10";
 
 export function Scramble({ text, className = "" }: { text: string; className?: string }) {
   const reduced = usePrefersReducedMotion();

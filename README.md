@@ -3,10 +3,10 @@
 > **Deep Learning in Health Care** — an AI triage workstation combining a patient registrar,
 > an SGD-trained symptom head, a chest X-ray pipeline, a dermoscopy classifier, a real in-browser
 > transformer encoder, and a medical NLP desk — fused into one decision-support console with a
-> 41-case QA bench.
+> 44-case QA bench.
 
 [![Live on GitHub Pages](https://img.shields.io/badge/LIVE-GitHub%20Pages-0e7c72)](https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/)
-[![QA Bench](https://img.shields.io/badge/QA-41%20cases%20in--browser-16241f)](https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/)
+[![QA Bench](https://img.shields.io/badge/QA-44%20cases%20in--browser-16241f)](https://smir1998.github.io/AI-Medical-Diagnosis-Assistant/)
 [![🤗 Transformers.js](https://img.shields.io/badge/🤗-Transformers.js-FFD21E)](https://huggingface.co/Xenova/all-MiniLM-L6-v2)
 [![License: MIT](https://img.shields.io/badge/License-MIT-a16207.svg)](LICENSE)
 
@@ -22,7 +22,7 @@ emergency number.
 
 | Module | Technique | What it does |
 | --- | --- | --- |
-| **Registrar** | On-device admission log (localStorage) | Intake form (name, age, sex, chief complaint, allergies, CTAS triage 1–5, HR/BP/SpO₂/temp vitals), auto-issued MRNs, clinical flag engine (hypoxia, tachycardia, febrile…), CSV export, chart/discharge workflow — the active patient stamps every report |
+| **Registrar** | On-device admission log (localStorage) | Intake form (name, age, sex, chief complaint, allergies, CTAS triage 1–5, HR/BP/SpO₂/temp vitals), auto-issued MRNs, clinical flag engine (hypoxia, tachycardia, febrile…), **per-MRN encounter trail** (every lab run tied to the chart on record), CSV export, chart/discharge workflow — the active patient stamps every report |
 | **Symptom Lab** | Multinomial Naive Bayes + one-hot vector UI | 24-dim symptom vector with live cell animation, scenario presets, softmax differential over 12 profiles, ICD-10 codes, severity tiers, red-flag rules |
 | **Training Grounds** | **Live SGD training in your browser** | Trains a multinomial logistic head on real disease–symptom associations (Kaggle), draws the loss curve epoch-by-epoch, and reports **measured** accuracy/precision/recall/F1 on a held-out split |
 | **Semantic Engine** | `Xenova/all-MiniLM-L6-v2` via Transformers.js | Real ONNX transformer inference: free-text chief complaint → cosine-ranked symptom vector, lazy-loaded (~23 MB q8 weights, cached) |
@@ -30,8 +30,8 @@ emergency number.
 | **Derm Scan** | CLAHE → Otsu ROI → 3-class head + ABCDE engine | Benign / atypical / melanoma-pattern screening with ABCDE rule flags |
 | **NLP Desk** | Keyword-weighted medical Q&A | CNNs, normalization, transfer learning, precision/recall, HF lineage, triage guidance |
 | **Model Registry** | Verified Hugging Face Hub lineage | Real production model per head, linked to live model pages (table below) |
-| **Report Engine** | Multi-modal report compilation | Printable patient analysis report (Print → PDF), vitals, flags, referral recommendations |
-| **QA Bench** | 41-case in-browser regression suite | Tests the live engine across 11 suites — SGD convergence, measured accuracy, HF model-registry integrity, invariants and edge cases (table below) |
+| **Report Engine** | Multi-modal report compilation | Patient analysis report with vitals, flags and referral recommendations — **true PDF export via jsPDF** (lazy-loaded, deterministic file names) plus print-isolated printing |
+| **QA Bench** | 44-case in-browser regression suite | Tests the live engine across 13 suites — SGD convergence, measured accuracy, encounter stamping, PDF plan determinism, HF model-registry integrity, invariants and edge cases (table below) |
 
 ## Real data — public datasets
 
@@ -73,7 +73,7 @@ benchmarks; only the Training Grounds and the Semantic Engine produce measured o
                                        • NLP desk
 ```
 
-## QA bench — 41 cases, 11 suites
+## QA bench — 44 cases, 13 suites
 
 | Suite | Cases | Covers |
 | --- | --- | --- |
@@ -88,6 +88,8 @@ benchmarks; only the Training Grounds and the Semantic Engine produce measured o
 | Semantic Utils | 2 | cosine identity/orthogonality, NaN guards |
 | Bundle | 1 | sample studies must ship bundled, never remote |
 | Live Trainer | 4 | SGD convergence, measured accuracy ≥ 70%, bit-identical determinism, trained-head behavior |
+| Encounter | 1 | per-MRN trail filtering, unstamped entries excluded |
+| PDF Plan | 2 | patient block + disclaimer presence, deterministic file name and line sequence |
 
 ## Curriculum coverage (all 13 steps)
 
@@ -120,7 +122,9 @@ keeps the branch content for every conflicting file in one command.
 ## Project structure
 
 ```
-├── public/og-banner.svg           # stable social/README banner
+├── public/
+│   ├── og-banner.svg              # stable social/README banner
+│   └── manifest.webmanifest       # PWA manifest (installable shell)
 ├── src/
 │   ├── assets/                    # bundled SVG teaching studies (no remote images)
 │   ├── components/                # Registrar, labs, report, rail, registry, trainer, QA bench
@@ -133,7 +137,9 @@ keeps the branch content for every conflicting file in one command.
 │       ├── naiveBayes.ts          # NB head trained from the reference table
 │       ├── train.ts               # live SGD trainer + measured metrics
 │       ├── semantic.ts            # Transformers.js MiniLM encoder
-│       └── tests.ts               # 41-case in-app QA bench
+│       ├── encounters.ts          # per-MRN encounter trail
+│       ├── pdf.ts                 # report plan + lazy jsPDF export
+│       └── tests.ts               # 44-case in-app QA bench
 ├── tests/                         # repo-level node:test regression suite
 ├── .github/workflows/deploy.yml   # Pages deployment (with Pages-enabled preflight)
 └── README.md

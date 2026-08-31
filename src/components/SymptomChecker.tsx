@@ -483,18 +483,38 @@ export function SymptomChecker({ onComplete, onPipeline, chiefComplaint }: Props
             </span>
           </div>
 
-          {result.redFlags.length > 0 && (
+          {(result.redFlagSymptoms.length > 0 || result.redFlags.length > 0) && (
             <div className="border-2 border-alert bg-alert/10 p-3.5">
-              <p className="mb-1.5 flex items-center gap-2 font-display text-xs font-extrabold uppercase tracking-wider text-alert">
+              <p className="mb-2 flex items-center gap-2 font-display text-xs font-extrabold uppercase tracking-wider text-alert">
                 <Icon name="warn" className="h-4 w-4" /> Red flags detected — seek in-person care
               </p>
-              <ul className="space-y-1 pl-6 text-[13px] text-alertdeep">
-                {result.redFlags.map((f) => (
-                  <li key={f} className="list-disc">
-                    {f}
-                  </li>
-                ))}
-              </ul>
+              {result.redFlagSymptoms.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {result.redFlagSymptoms.map((s) => (
+                    <span
+                      key={s}
+                      className="inline-flex items-center gap-1.5 border border-alert bg-alert px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-paper shadow-[2px_2px_0_0_rgba(140,47,39,0.55)]"
+                    >
+                      <Icon name="warn" className="h-3 w-3" /> {s}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {result.redFlags.length > 0 && (
+                <ul className="mt-2 space-y-1 pl-6 text-[13px] text-alertdeep">
+                  {result.redFlags.map((f) => (
+                    <li key={f} className="list-disc">
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="mt-3 border-l-4 border-alert bg-paper px-3 py-2 font-mono text-[11px] font-bold tracking-wide text-alertdeep">
+                DO NOT RELY ON AN AI ESTIMATE FOR IT.{" "}
+                <span className="font-semibold normal-case tracking-normal text-inksoft">
+                  Red-flag symptoms must be evaluated by a clinician, in person.
+                </span>
+              </p>
             </div>
           )}
 

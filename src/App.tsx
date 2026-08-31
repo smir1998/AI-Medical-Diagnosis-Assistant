@@ -120,6 +120,7 @@ function sanitizeHistory(raw: unknown): HistoryEntry | null {
     type,
     title: e.title,
     confidence: typeof e.confidence === "number" && Number.isFinite(e.confidence) ? e.confidence : -1,
+    mrn: typeof e.mrn === "string" ? e.mrn : undefined,
   };
 }
 
@@ -208,6 +209,7 @@ export default function App() {
         type: "adm" as const,
         title: `${p.name} · T${p.triage} admitted`,
         confidence: -1,
+        mrn: p.id,
       },
       ...h,
     ]);
@@ -234,6 +236,7 @@ export default function App() {
         type: "symptom" as const,
         title: r.scored[0]?.disease.name ?? "—",
         confidence: r.scored[0]?.confidence ?? 0,
+        mrn: activePatient?.id,
       },
       ...h,
     ]);
@@ -248,6 +251,7 @@ export default function App() {
         type: "image" as const,
         title: r.fileName || "Chest X-ray",
         confidence: Math.max(r.pneumonia, r.normal),
+        mrn: activePatient?.id,
       },
       ...h,
     ]);
@@ -262,6 +266,7 @@ export default function App() {
         type: "derm" as const,
         title: r.fileName,
         confidence: Math.max(r.benign, r.atypical, r.melanoma),
+        mrn: activePatient?.id,
       },
       ...h,
     ]);
@@ -360,6 +365,7 @@ export default function App() {
           </Reveal>
           <Reveal delay={120}>
             <PatientRegistry
+              history={history}
               patients={patients}
               activeId={activePatientId}
               onAdmit={onAdmit}
@@ -449,23 +455,13 @@ export default function App() {
 
       <ECGLine className="block h-12 w-full text-teal/70" slow />
 
-      <div className="cv-auto">
-        <InsideModel />
-      </div>
-      <div className="cv-auto">
-        <Suspense fallback={<ModuleFallback />}>
-          <TrainingGrounds onTrained={setTrainedModel} />
-        </Suspense>
-      </div>
-      <div className="cv-auto">
-        <Evaluation />
-      </div>
-      <div className="cv-auto">
-        <ModelRegistry />
-      </div>
-      <div className="cv-auto">
-        <FieldNotes />
-      </div>
+      <InsideModel />
+      <Suspense fallback={<ModuleFallback />}>
+        <TrainingGrounds onTrained={setTrainedModel} />
+      </Suspense>
+      <Evaluation />
+      <ModelRegistry />
+      <FieldNotes />
 
       {/* ---------- footer ---------- */}
       <footer className="dark-grid border-t-4 border-alert text-paper">

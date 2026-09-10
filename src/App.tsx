@@ -6,6 +6,7 @@ import { ImageAnalysis } from "./components/ImageAnalysis";
 import { Chatbot } from "./components/Chatbot";
 import { ReportPanel } from "./components/ReportPanel";
 import { ModelRegistry } from "./components/ModelRegistry";
+import { TrainingGrounds } from "./components/TrainingGrounds";
 
 type Tab = "patient" | "symptom" | "image" | "chat";
 
@@ -123,6 +124,9 @@ export default function App() {
 
       {/* Model Registry */}
       <ModelRegistry />
+
+      {/* Training Grounds */}
+      <TrainingGrounds onTrained={() => {}} />
 
       {/* Footer */}
       <footer className="dark-grid border-t-4 border-alert text-paper">

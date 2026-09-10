@@ -28,7 +28,6 @@ body {
   color: var(--color-ink);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
-  /* ECG chart-paper grid */
   background-image:
     repeating-linear-gradient(0deg, rgba(14, 124, 114, 0.055) 0 1px, transparent 1px 26px),
     repeating-linear-gradient(90deg, rgba(14, 124, 114, 0.055) 0 1px, transparent 1px 26px),
@@ -36,7 +35,6 @@ body {
     repeating-linear-gradient(90deg, rgba(14, 124, 114, 0.1) 0 1px, transparent 1px 130px);
 }
 
-/* dark clinical sections keep their own grid */
 .dark-grid {
   background-color: var(--color-pine);
   background-image:
@@ -44,17 +42,15 @@ body {
     repeating-linear-gradient(90deg, rgba(143, 227, 207, 0.06) 0 1px, transparent 1px 24px);
 }
 
-/* film grain over everything */
 .noise-overlay {
   position: fixed;
   inset: 0;
   z-index: 70;
   pointer-events: none;
   opacity: 0.05;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+  background-image: url("image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
 }
 
-/* ---------- scroll reveals ---------- */
 .reveal {
   opacity: 0;
   transform: translateY(18px);
@@ -67,7 +63,6 @@ body {
   transform: none;
 }
 
-/* ---------- keyframes ---------- */
 @keyframes blink-soft {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.25; }
@@ -88,31 +83,11 @@ body {
   animation: scan-y 1.7s linear infinite;
 }
 
-@keyframes reticle-spin {
-  to { transform: rotate(360deg); }
-}
-.reticle {
-  animation: reticle-spin 3.2s linear infinite;
-  transform-origin: center;
-}
-
 @keyframes hotspot-pulse {
   0%, 100% { transform: scale(1); opacity: 0.8; }
   50% { transform: scale(1.14); opacity: 0.45; }
 }
 .hotspot { animation: hotspot-pulse 2.4s ease-in-out infinite; }
-
-@keyframes cell-scan {
-  0%, 100% { background-color: rgba(14, 124, 114, 0.95); box-shadow: 0 0 8px rgba(143, 227, 207, 0.8); }
-  50% { background-color: rgba(143, 227, 207, 0.55); }
-}
-.cell-scan { animation: cell-scan 0.7s ease-in-out infinite; }
-
-@keyframes row-flash {
-  from { background-color: rgba(14, 124, 114, 0.32); }
-  to { background-color: transparent; }
-}
-.row-flash { animation: row-flash 1.4s ease-out both; }
 
 @keyframes ecg-draw {
   0% { stroke-dashoffset: 100; }
@@ -157,7 +132,6 @@ body {
 }
 .dot-live { animation: dot-pulse 1.8s ease-out infinite; }
 
-/* ---------- scrollbars ---------- */
 .log-scroll::-webkit-scrollbar,
 .chat-scroll::-webkit-scrollbar {
   width: 6px;
@@ -171,12 +145,10 @@ body {
   background: transparent;
 }
 
-/* ---------- print (PDF report) ---------- */
 .report-card {
   break-inside: avoid;
 }
 @media print {
-  /* isolate the patient report: hide everything else */
   body * {
     visibility: hidden !important;
   }
@@ -206,7 +178,6 @@ body {
   }
 }
 
-/* ---------- reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

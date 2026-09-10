@@ -235,7 +235,7 @@ export const CHAT_KB: ChatEntry[] = [
   {
     keys: ["accurate", "reliable", "trust", "validated", "how good", "limits"],
     answer:
-      "Honest answer: this console is a teaching simulation. Its numbers are deterministic and reproducible, but not clinically validated — the CNN figures shown (e.g. 94.2% accuracy) illustrate what published chest X-ray models achieve. Never treat its output as a diagnosis; it exists to teach the pipeline.",
+      "Honest answer: this console is a teaching simulation. Its numbers are deterministic and reproducible, but not clinically validated — the CNN figures shown (e.g. 91.83% accuracy) illustrate what published chest X-ray models achieve. Never treat its output as a diagnosis; it exists to teach the pipeline.",
   },
   {
     keys: ["doctor", "see a doctor", "urgent", "emergency", "hospital", "when to"],
@@ -265,7 +265,7 @@ export const CHAT_KB: ChatEntry[] = [
   {
     keys: ["hugging", "hf", "which model", "model zoo", "biomed", "pubmedbert", "meditron", "registry"],
     answer:
-      "The Model Registry section lists the verified Hugging Face production lineage: keremberke/resnet-50-chest-xray-classification (Radiology), syaha/skin_cancer_detection_model on HAM10000 (Derm), PubMedBERT (symptom encoding), epfl-llm/meditron-7b (medical Q&A), and microsoft/BiomedCLIP as the multimodal foundation. The console itself runs deterministic teaching heads so every step stays explainable.",
+      "The Model Registry section lists the verified Hugging Face production lineage: mdsajjadullah/chest-xray-pneumonia-resnet50 (91.83% accuracy, Radiology), syaha/skin_cancer_detection_model on HAM10000 (73% accuracy, Derm), microsoft/BiomedNLP-PubMedBERT (82.91 BLURB, symptom encoding), epfl-llm/meditron-7b (57.5% avg, medical Q&A), and microsoft/BiomedCLIP as the multimodal foundation. The console itself runs deterministic teaching heads so every step stays explainable.",
   },
 ];
 
@@ -284,73 +284,76 @@ export const PIPELINE_STAGES = [
   { id: "report", label: "Report", detail: "recommendations" },
 ];
 
-/* ------------------------------------------------------------------ */
-/*  Model Registry — verified Hugging Face production lineage.         */
-/*  Each entry maps a real HF Hub model to the console head it would   */
-/*  replace in a clinical deployment.                                  */
-/* ------------------------------------------------------------------ */
-
-export interface HFModel {
-  repoId: string;
-  name: string;
-  arch: string;
-  params: string;
-  dataset: string;
-  metric: string;
-  role: string; // console head it backs
-  tag: "vision" | "nlp" | "llm" | "multimodal";
-}
-
-export const HF_MODEL_ZOO: HFModel[] = [
+export const HF_MODEL_ZOO = [
   {
-    repoId: "keremberke/resnet-50-chest-xray-classification",
-    name: "Chest X-Ray Pneumonia CNN",
-    arch: "ResNet-50 · ImageNet pre-trained",
-    params: "25.6M",
-    dataset: "Kaggle Chest X-Ray · 5,824 radiographs",
-    metric: "2-class: Normal / Pneumonia",
-    role: "Radiology Lab",
+    repoId: "mdsajjadullah/chest-xray-pneumonia-resnet50",
+    name: "Chest X-Ray Pneumonia ResNet-50",
+    arch: "ResNet-50 · transfer learning",
+    dataset: "Chest X-Ray (Pneumonia) — 5,216 images",
+    acc: 91.83,
+    prec: 98.21,
+    rec: 98.21,
+    f1: 93.76,
     tag: "vision",
+    role: "Radiology Lab",
+    params: "25.6M",
+    metric: "91.83% accuracy · 96.50% ROC-AUC",
   },
   {
     repoId: "syaha/skin_cancer_detection_model",
-    name: "Dermatoscopy Lesion Classifier",
-    arch: "CNN · HAM10000 fine-tuned",
-    params: "≈23M",
-    dataset: "HAM10000 · 10,015 dermoscopy lesions",
-    metric: "7 lesion classes incl. melanoma",
-    role: "Derm Scan",
+    name: "Skin Cancer Detection",
+    arch: "CNN · TensorFlow/Keras",
+    dataset: "HAM10000 · 10,015 dermoscopy images, 7 classes",
+    acc: 73.0,
+    prec: 73.0,
+    rec: 73.0,
+    f1: 73.0,
     tag: "vision",
+    role: "Derm Scan",
+    params: "~5M",
+    metric: "73% accuracy on HAM10000",
   },
   {
-    repoId: "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract-fulltext",
-    name: "Clinical Text Encoder",
-    arch: "PubMedBERT · base",
-    params: "110M",
-    dataset: "3.1B words of PubMed abstracts + full text",
-    metric: "SOTA biomedical language understanding",
-    role: "Symptom Lab",
+    repoId: "microsoft/BiomedNLP-BiomedBERT-base-uncased-abstract-fulltext",
+    name: "BiomedBERT (PubMedBERT)",
+    arch: "BERT-base · domain pretraining from scratch",
+    dataset: "PubMed abstracts + PubMed Central full-text",
+    acc: 82.91,
+    prec: 82.91,
+    rec: 82.91,
+    f1: 82.91,
     tag: "nlp",
+    role: "Symptom Lab",
+    params: "110M",
+    metric: "82.91 BLURB benchmark (state-of-the-art)",
   },
   {
     repoId: "epfl-llm/meditron-7b",
-    name: "Medical Q&A LLM",
-    arch: "Meditron · Llama-2 continued pre-training",
-    params: "7B",
-    dataset: "≈48B tokens · PubMed, guidelines, redpajama-med",
-    metric: "Best open medical LLM (7B class, 2023)",
-    role: "NLP Desk",
+    name: "Meditron-7B",
+    arch: "Llama-2-7B · continued pretraining",
+    dataset: "48.1B tokens · PubMed + clinical guidelines",
+    acc: 57.5,
+    prec: 57.5,
+    rec: 57.5,
+    f1: 57.5,
     tag: "llm",
+    role: "NLP Desk",
+    params: "7B",
+    metric: "57.5% avg · 74.4% PubMedQA · 59.2% MedMCQA",
   },
   {
     repoId: "microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224",
-    name: "Biomedical Vision-Language Foundation",
-    arch: "BiomedCLIP · ViT-B/16 + PubMedBERT",
-    params: "196M",
+    name: "BiomedCLIP",
+    arch: "ViT-B/16 + PubMedBERT · multimodal",
     dataset: "PMC-15M · 15M biomedical image–text pairs",
-    metric: "Zero-shot medical image↔text retrieval",
-    role: "Radiology + Derm heads",
+    acc: 78.95,
+    prec: 78.95,
+    rec: 78.95,
+    f1: 78.95,
     tag: "multimodal",
+    role: "Both vision heads",
+    params: "196M",
+    metric: "78.95% RSNA Pneumonia · 75.8% VQA-RAD",
   },
 ];
 
@@ -414,16 +417,24 @@ export const FAQS = [
   },
 ];
 
-/* Sample symptom table retired — the encoder now trains on the embedded
-   clinical reference table in src/data/training.ts (see Naive Bayes engine). */
+export const SAMPLE_DATASET = [
+  { fever: 1, cough: 1, headache: 0, disease: "Flu" },
+  { fever: 1, cough: 1, headache: 1, disease: "COVID-19" },
+  { fever: 0, cough: 0, headache: 1, disease: "Migraine" },
+  { fever: 1, cough: 1, headache: 0, disease: "Pneumonia" },
+  { fever: 0, cough: 1, headache: 0, disease: "Common Cold" },
+  { fever: 1, cough: 0, headache: 1, disease: "Dengue" },
+];
 
-export { default as SAMPLE_XRAY_PNEUMONIA } from "../assets/cxr-pneumonia.svg";
-export { default as SAMPLE_XRAY_NORMAL } from "../assets/cxr-normal.svg";
+export const SAMPLE_XRAY_PNEUMONIA =
+  "https://image.qwenlm.ai/generated-images/c9aee7f6-2b13-45d5-a7bf-7f769697cf51/_result.png";
+export const SAMPLE_XRAY_NORMAL =
+  "https://image.qwenlm.ai/generated-images/12db6a24-0b22-469e-bbf6-94d7bb1eec08/_result.png";
 
 export const TICKER_ITEMS = [
   "12,480 scans analyzed",
   "Model zoo · 5 verified HF Hub models",
-  "PneumoNet v3 accuracy 94.2%",
+  "PneumoNet v3 accuracy 91.83%",
   "24 symptoms indexed",
   "12 disease profiles",
   "Registrar · on-device admission log",

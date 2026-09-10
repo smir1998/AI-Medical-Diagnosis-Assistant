@@ -1,410 +1,100 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { DURATIONS, SYMPTOMS, SYMPTOM_GROUPS } from "../data/medical";
-import { analyzeSymptoms, prefersReducedMotion, sleep } from "../lib/engine";
-import type { SymptomResult } from "../lib/engine";
-import { NB_ALPHA, NB_MODEL } from "../lib/naiveBayes";
-import { CountUp, Icon } from "./ui";
-import {
-  SEMANTIC_MODEL_ID,
-  SIM_THRESHOLD,
-  semanticMatch,
-  type SemanticMatch,
-  type SemanticStatus,
-} from "../lib/semantic";
-
-const RUN_SCRIPT = [
-  { stage: 0, line: "▸ encoding symptom vector … 24-dim binary" },
-  { stage: 0, line: "▸ duration × severity weighting applied" },
-  { stage: 1, line: "▸ Laplace-smoothed log-likelihoods (α=1)" },
-  { stage: 2, line: "▸ log-priors from 2,550 weighted rows" },
-  { stage: 3, line: "▸ normalize → posterior probabilities" },
-  { stage: 3, line: "▸ red-flag rule engine … scanning" },
-  { stage: 4, line: "✓ inference complete — compiling report" },
-];
-
-const PRESETS: { label: string; note: string; ids: string[]; durationIdx: number; severity: number }[] = [
-  {
-    label: "Flu-like",
-    note: "classic viral",
-    ids: ["fever", "cough", "muscle_aches", "fatigue", "chills"],
-    durationIdx: 1,
-    severity: 6,
-  },
-  {
-    label: "Cardiac alarm",
-    note: "red-flag demo",
-    ids: ["chest_pain", "shortness_breath", "fatigue"],
-    durationIdx: 0,
-    severity: 9,
-  },
-  {
-    label: "GI bug",
-    note: "dehydration watch",
-    ids: ["diarrhea", "vomiting", "nausea", "abdominal_pain"],
-    durationIdx: 1,
-    severity: 5,
-  },
-  {
-    label: "Neuro",
-    note: "headache workup",
-    ids: ["headache", "nausea", "dizziness"],
-    durationIdx: 2,
-    severity: 6,
-  },
-];
-
-/* keyword map: chief-complaint free text → symptom ids */
-const CC_HINTS: { re: RegExp; ids: string[] }[] = [
-  { re: /fever|febrile|temp|chill/i, ids: ["fever", "chills"] },
-  { re: /cough/i, ids: ["cough"] },
-  { re: /throat/i, ids: ["sore_throat"] },
-  { re: /head|migraine/i, ids: ["headache"] },
-  { re: /breath|wheeze|asthma/i, ids: ["shortness_breath"] },
-  { re: /chest/i, ids: ["chest_pain"] },
-  { re: /stomach|abdom|tummy|belly|cramp/i, ids: ["abdominal_pain"] },
-  { re: /vomit|throw/i, ids: ["vomiting"] },
-  { re: /nausea|queasy/i, ids: ["nausea"] },
-  { re: /diarr|loose/i, ids: ["diarrhea"] },
-  { re: /rash/i, ids: ["rash"] },
-  { re: /itch/i, ids: ["itching"] },
-  { re: /urin|pee|dysuria/i, ids: ["burning_urination"] },
-  { re: /joint/i, ids: ["joint_pain"] },
-  { re: /muscle|ache/i, ids: ["muscle_aches"] },
-  { re: /dizz|vertigo|faint/i, ids: ["dizziness"] },
-  { re: /tired|fatigue|weak|exhaust/i, ids: ["fatigue"] },
-  { re: /nose|sneez|allerg|hay/i, ids: ["runny_nose", "sneezing"] },
-  { re: /sweat/i, ids: ["night_sweats"] },
-  { re: /weight/i, ids: ["weight_loss"] },
-  { re: /taste|smell/i, ids: ["loss_taste"] },
-];
-
-export function ccToSymptoms(cc: string): string[] {
-  const out = new Set<string>();
-  for (const h of CC_HINTS) if (h.re.test(cc)) h.ids.forEach((i) => out.add(i));
-  return [...out];
-}
+import { useState } from "react";
+import { SYMPTOMS, DISEASES, RED_FLAG_SINGLE } from "../data/medical";
 
 interface Props {
-  onComplete: (r: SymptomResult) => void;
-  onPipeline: (stage: number, running: boolean) => void;
-  chiefComplaint?: string;
+  onComplete: (result: any) => void;
 }
 
-export function SymptomChecker({ onComplete, onPipeline, chiefComplaint }: Props) {
-  const [selected, setSelected] = useState<Set<string>>(new Set(["fever", "cough", "fatigue"]));
-  const [durationIdx, setDurationIdx] = useState(1);
+export function SymptomChecker({ onComplete }: Props) {
+  const [selected, setSelected] = useState<Set<string>>(new Set(["fever", "cough"]));
+  const [duration, setDuration] = useState(1);
   const [severity, setSeverity] = useState(5);
-  const [running, setRunning] = useState(false);
-  const [log, setLog] = useState<string[]>([]);
-  const [result, setResult] = useState<SymptomResult | null>(null);
-  const alive = useRef(true);
-
-  useEffect(() => {
-    alive.current = true;
-    return () => {
-      alive.current = false;
-    };
-  }, []);
-
-  const ccMatches = useMemo(
-    () => (chiefComplaint && chiefComplaint !== "—" ? ccToSymptoms(chiefComplaint) : []),
-    [chiefComplaint]
-  );
-
-  /* ---------- real HF model: semantic CC matcher ---------- */
-  const [semStatus, setSemStatus] = useState<SemanticStatus>({ kind: "idle" });
-  const [semMatches, setSemMatches] = useState<SemanticMatch[]>([]);
-  const semBusy = useRef(false);
-
-  useEffect(() => {
-    // chart changed → re-arm required
-    setSemMatches([]);
-    setSemStatus({ kind: "idle" });
-  }, [chiefComplaint]);
-
-  const armSemantic = async () => {
-    if (!chiefComplaint || chiefComplaint === "—" || semBusy.current) return;
-    semBusy.current = true;
-    setSemStatus({ kind: "loading", file: "onnx/model_quantized.onnx", pct: 0 });
-    try {
-      const matches = await semanticMatch(chiefComplaint, (file, pct) => {
-        if (alive.current) setSemStatus({ kind: "loading", file, pct });
-      });
-      if (!alive.current) return;
-      setSemMatches(matches);
-      setSemStatus({ kind: "live" });
-      setLog((prev) => [
-        ...prev,
-        `▸ semantic matcher: ${matches.length} symptom(s) ≥ cos ${SIM_THRESHOLD}`,
-      ]);
-    } catch {
-      if (alive.current)
-        setSemStatus({ kind: "error", reason: "model unreachable — regex map active" });
-    } finally {
-      semBusy.current = false;
-    }
-  };
-
-  const effectiveCc = semStatus.kind === "live" ? semMatches.map((m) => m.id) : ccMatches;
-
-  const applyCc = () => {
-    if (running || effectiveCc.length === 0) return;
-    setSelected((prev) => new Set([...prev, ...effectiveCc]));
-    setResult(null);
-  };
 
   const toggle = (id: string) => {
-    if (running) return;
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelected(next);
+  };
+
+  const analyze = () => {
+    if (selected.size === 0) return;
+
+    const scores = DISEASES.map((d) => {
+      let score = d.base;
+      for (const id of selected) {
+        const w = d.weights[id];
+        if (w) score += w;
+      }
+      return { disease: d, score };
     });
-    setResult(null);
-  };
 
-  const applyPreset = (p: (typeof PRESETS)[number]) => {
-    if (running) return;
-    setSelected(new Set(p.ids));
-    setDurationIdx(p.durationIdx);
-    setSeverity(p.severity);
-    setResult(null);
-  };
+    const max = Math.max(...scores.map((s) => s.score));
+    const exps = scores.map((s) => Math.exp((s.score - max) / 2.1));
+    const sum = exps.reduce((a, b) => a + b, 0);
 
-  const run = async () => {
-    if (running || selected.size === 0) return;
-    const reduced = prefersReducedMotion();
-    setRunning(true);
-    setResult(null);
-    setLog([]);
-    for (let i = 0; i < RUN_SCRIPT.length; i++) {
-      const step = RUN_SCRIPT[i];
-      onPipeline(step.stage, true);
-      setLog((prev) => [...prev, step.line]);
-      if (!reduced) await sleep(i === 0 ? 260 : 330);
-      if (!alive.current) return;
-    }
-    const res = analyzeSymptoms([...selected], durationIdx, severity);
-    setResult(res);
-    onComplete(res);
-    onPipeline(4, false);
-    setRunning(false);
-  };
+    const results = scores
+      .map((s, i) => ({
+        disease: s.disease,
+        confidence: (exps[i] / sum) * 100,
+      }))
+      .sort((a, b) => b.confidence - a.confidence);
 
-  const groups = SYMPTOM_GROUPS.map((g) => ({
-    group: g,
-    items: SYMPTOMS.filter((s) => s.group === g),
-  }));
+    const redFlags = [...selected].filter((id) => RED_FLAG_SINGLE.includes(id));
+
+    onComplete({
+      results,
+      redFlags,
+      duration: ["< 24 hours", "1–3 days", "4–7 days", "> 1 week"][duration],
+      severity,
+    });
+  };
 
   return (
     <div className="space-y-6">
-      {/* chart cross-link + real-model semantic engine */}
-      {chiefComplaint && chiefComplaint !== "—" && (
-        <div className="border-2 border-teal/45 bg-teal/10">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3.5 py-2.5">
-            <Icon name="stetho" className="h-4 w-4 shrink-0 text-teal" />
-            <span className="min-w-0 font-mono text-[10px] leading-relaxed tracking-wider text-inksoft">
-              CHART CC <span className="font-bold text-ink">“{chiefComplaint}”</span> → {ccMatches.length} keyword
-              match{ccMatches.length === 1 ? "" : "es"}
-            </span>
-            {semStatus.kind === "idle" && (
-              <button
-                onClick={armSemantic}
-                disabled={running}
-                className="ml-auto inline-flex shrink-0 items-center gap-1.5 border border-ink bg-paper px-2.5 py-1 font-mono text-[9px] font-bold tracking-[0.18em] text-ink transition-all duration-200 hover:-translate-y-px hover:bg-ink hover:text-paper disabled:opacity-40"
-                title="Runs Xenova/all-MiniLM-L6-v2 (ONNX q8, ≈22.7 MB) in this browser via Transformers.js"
-              >
-                <Icon name="brain" className="h-3 w-3" /> ARM SEMANTIC ENGINE
-              </button>
-            )}
-            {semStatus.kind === "loading" && (
-              <span className="ml-auto inline-flex shrink-0 items-center gap-2 font-mono text-[9px] font-bold tracking-[0.18em] text-ink">
-                <span className="blink-soft">▮▮▮</span> PULLING WEIGHTS
-                <span className="inline-block h-1.5 w-20 bg-ink/15">
-                  <span
-                    className="block h-full bg-teal transition-all duration-200"
-                    style={{ width: `${Math.min(100, semStatus.pct)}%` }}
-                  />
-                </span>
-                {Math.round(semStatus.pct)}%
-              </span>
-            )}
-            {semStatus.kind === "live" && (
-              <span className="ml-auto inline-flex shrink-0 items-center gap-1.5 font-mono text-[9px] font-bold tracking-[0.18em] text-teal">
-                <span className="h-1.5 w-1.5 rounded-full bg-teal dot-live" /> LIVE · {SEMANTIC_MODEL_ID} · 384-DIM
-              </span>
-            )}
-            {semStatus.kind === "error" && (
-              <span className="ml-auto inline-flex shrink-0 items-center gap-1.5 font-mono text-[9px] font-bold tracking-[0.18em] text-alertdeep">
-                <Icon name="warn" className="h-3 w-3 text-alert" /> {semStatus.reason.toUpperCase()}
-              </span>
-            )}
-          </div>
-
-          {/* ranked semantic matches */}
-          {semStatus.kind === "live" && semMatches.length > 0 && (
-            <div className="border-t border-dashed border-teal/40 px-3.5 py-2.5">
-              <p className="mb-1.5 font-mono text-[9px] font-bold tracking-[0.22em] text-inksoft">
-                COSINE RANK · THRESHOLD {SIM_THRESHOLD} · {semMatches.length} HIT{semMatches.length === 1 ? "" : "S"}
-              </p>
-              <ul className="space-y-1">
-                {semMatches.slice(0, 6).map((m) => (
-                  <li key={m.id} className="flex items-center gap-2.5 font-mono text-[11px]">
-                    <span className="w-40 shrink-0 truncate font-semibold text-ink">{m.label}</span>
-                    <span className="h-1.5 flex-1 bg-ink/10">
-                      <span className="bar-fill block h-full bg-teal" style={{ width: `${Math.min(100, m.score * 100)}%` }} />
-                    </span>
-                    <span className="w-12 shrink-0 text-right tabular-nums text-teal">{m.score.toFixed(2)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <div className="flex items-center justify-end border-t border-dashed border-teal/40 px-3.5 py-2">
-            <button
-              onClick={applyCc}
-              disabled={running || effectiveCc.length === 0}
-              className="inline-flex shrink-0 items-center gap-1.5 border border-teal bg-paper px-2.5 py-1 font-mono text-[9px] font-bold tracking-[0.18em] text-teal transition-all duration-200 hover:-translate-y-px hover:bg-teal hover:text-paper disabled:opacity-40"
-            >
-              <Icon name="arrow" className="h-3 w-3" />
-              PULL {effectiveCc.length} INTO VECTOR
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* scenario presets */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="font-mono text-[10px] font-bold tracking-[0.22em] text-inksoft uppercase">
-          Scenario presets
-        </span>
-        {PRESETS.map((p) => (
-          <button
-            key={p.label}
-            onClick={() => applyPreset(p)}
-            disabled={running}
-            title={`${p.ids.length} symptoms · ${p.note}`}
-            className="group border border-ink/25 bg-paperdeep/50 px-3 py-1.5 text-left transition-all duration-200 hover:-translate-y-px hover:border-teal hover:bg-teal/10 disabled:opacity-50"
-          >
-            <span className="block font-display text-[12px] font-extrabold uppercase tracking-wide leading-none">
-              {p.label}
-            </span>
-            <span className="mt-0.5 block font-mono text-[9px] text-inksoft">{p.note}</span>
-          </button>
-        ))}
-        <button
-          onClick={() => {
-            if (running) return;
-            setSelected(new Set());
-            setResult(null);
-          }}
-          disabled={running}
-          className="border border-ink/25 px-3 py-1.5 font-mono text-[10px] font-semibold tracking-widest text-inksoft uppercase transition-all duration-200 hover:border-alert hover:text-alert disabled:opacity-50"
-        >
-          Clear all
-        </button>
-      </div>
-
-      {/* intake form */}
       <div>
         <div className="mb-3 flex items-baseline justify-between">
-          <h3 className="font-display text-sm font-extrabold uppercase tracking-wide text-ink">
-            Chief complaints
-          </h3>
-          <span className="font-mono text-xs text-inksoft">
-            {selected.size} / {SYMPTOMS.length} selected
-          </span>
+          <h3 className="font-display text-sm font-extrabold uppercase tracking-wide text-ink">Chief complaints</h3>
+          <span className="font-mono text-xs text-inksoft">{selected.size} / {SYMPTOMS.length} selected</span>
         </div>
 
-        <div className="space-y-4">
-          {groups.map(({ group, items }) => (
-            <div key={group}>
-              <p className="mb-1.5 font-mono text-[10px] font-semibold tracking-[0.22em] text-teal uppercase">
-                ── {group}
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {items.map((s) => {
-                  const on = selected.has(s.id);
-                  return (
-                    <button
-                      key={s.id}
-                      onClick={() => toggle(s.id)}
-                      disabled={running}
-                      aria-pressed={on}
-                      className={`group inline-flex items-center gap-1.5 border px-2.5 py-1.5 text-[13px] font-medium transition-all duration-200 disabled:opacity-50 ${
-                        on
-                          ? "border-teal bg-teal text-paper shadow-[3px_3px_0_0_rgba(11,47,45,0.9)] -translate-y-px"
-                          : "border-ink/20 bg-paper text-ink hover:border-teal hover:text-teal hover:-translate-y-px"
-                      }`}
-                    >
-                      <span
-                        className={`grid h-3.5 w-3.5 place-items-center border ${
-                          on ? "border-paper/60" : "border-ink/30 group-hover:border-teal"
-                        }`}
-                      >
-                        {on && <Icon name="check" className="h-2.5 w-2.5" />}
-                      </span>
-                      {s.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* one-hot encoding readout */}
-      <div className="border border-ink/15 bg-paperdeep/40 p-3">
-        <p className="mb-2 flex items-center justify-between font-mono text-[10px] font-bold tracking-[0.22em] text-inksoft uppercase">
-          <span className="flex items-center gap-1.5">
-            <Icon name="layers" className="h-3.5 w-3.5 text-teal" /> Input tensor · one-hot
-          </span>
-          <span className="tabular-nums text-teal">
-            Σ = {selected.size} / {SYMPTOMS.length}
-          </span>
-        </p>
-        <div className="flex flex-wrap gap-[3px]" aria-hidden="true">
-          {SYMPTOMS.map((s, i) => {
+        <div className="flex flex-wrap gap-1.5">
+          {SYMPTOMS.map((s) => {
             const on = selected.has(s.id);
             return (
-              <span
+              <button
                 key={s.id}
-                title={`${s.label} = ${on ? 1 : 0}`}
-                style={{ transitionDelay: `${i * 18}ms` }}
-                className={`h-4 w-3 transition-all duration-300 ${
+                onClick={() => toggle(s.id)}
+                className={`group inline-flex items-center gap-1.5 border px-2.5 py-1.5 text-[13px] font-medium transition-all duration-200 ${
                   on
-                    ? running
-                      ? "cell-scan"
-                      : "bg-teal shadow-[0_0_6px_rgba(14,124,114,0.5)]"
-                    : "bg-ink/15"
+                    ? "border-teal bg-teal text-paper shadow-[3px_3px_0_0_rgba(11,47,45,0.9)]"
+                    : "border-ink/20 bg-paper text-ink hover:border-teal hover:text-teal"
                 }`}
-              />
+              >
+                <span className={`grid h-3.5 w-3.5 place-items-center border ${on ? "border-paper/60" : "border-ink/30"}`}>
+                  {on && (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="h-2.5 w-2.5">
+                      <path d="m4.5 12.5 5 5 10-11" />
+                    </svg>
+                  )}
+                </span>
+                {s.label}
+              </button>
             );
           })}
         </div>
-        <p className="mt-2 font-mono text-[9px] tracking-wider text-inksoft/70">
-          [ {SYMPTOMS.map((s) => (selected.has(s.id) ? 1 : 0)).join(" ")} ] — the exact 24-dim vector the
-          encoder receives
-        </p>
       </div>
 
-      {/* duration + severity */}
       <div className="grid gap-5 border-t border-dashed border-ink/20 pt-5 sm:grid-cols-2">
         <div>
-          <p className="mb-2 font-mono text-[10px] font-semibold tracking-[0.22em] text-teal uppercase">
-            ── Duration
-          </p>
+          <p className="mb-2 font-mono text-[10px] font-semibold tracking-[0.22em] text-teal uppercase">── Duration</p>
           <div className="flex flex-wrap gap-1.5">
-            {DURATIONS.map((d, i) => (
+            {["< 24 hours", "1–3 days", "4–7 days", "> 1 week"].map((d, i) => (
               <button
                 key={d}
-                onClick={() => setDurationIdx(i)}
-                disabled={running}
-                className={`border px-3 py-1.5 font-mono text-xs transition-all duration-200 disabled:opacity-50 ${
-                  durationIdx === i
+                onClick={() => setDuration(i)}
+                className={`border px-3 py-1.5 font-mono text-xs transition-all duration-200 ${
+                  duration === i
                     ? "border-ink bg-ink text-paper shadow-[3px_3px_0_0_rgba(14,124,114,0.9)]"
                     : "border-ink/20 bg-paper text-inksoft hover:border-ink hover:text-ink"
                 }`}
@@ -424,154 +114,22 @@ export function SymptomChecker({ onComplete, onPipeline, chiefComplaint }: Props
             min={1}
             max={10}
             value={severity}
-            disabled={running}
             onChange={(e) => setSeverity(Number(e.target.value))}
             className="w-full accent-teal"
-            aria-label="Symptom severity from 1 to 10"
           />
-          <div className="flex justify-between font-mono text-[10px] text-inksoft/70">
-            <span>mild</span>
-            <span>incapacitating</span>
-          </div>
         </div>
       </div>
 
-      {/* run button + inference log */}
-      <div className="flex flex-col gap-4 border-t border-dashed border-ink/20 pt-5 sm:flex-row">
-        <button
-          onClick={run}
-          disabled={running || selected.size === 0}
-          className={`group relative inline-flex shrink-0 items-center justify-center gap-2 px-6 py-3.5 font-display text-sm font-extrabold uppercase tracking-wider transition-all duration-200 ${
-            running || selected.size === 0
-              ? "cursor-not-allowed border border-ink/20 bg-paperdeep text-ink/40"
-              : "bg-alert text-paper shadow-[5px_5px_0_0_rgba(11,47,45,1)] hover:-translate-y-0.5 hover:shadow-[7px_7px_0_0_rgba(11,47,45,1)] active:translate-y-0 active:shadow-[3px_3px_0_0_rgba(11,47,45,1)]"
-          }`}
-        >
-          {running ? (
-            <>
-              <Icon name="layers" className="h-4 w-4 spin-slow" /> Inferring…
-            </>
-          ) : (
-            <>
-              <Icon name="brain" className="h-4 w-4 transition-transform group-hover:scale-110" />
-              Run neural analysis
-            </>
-          )}
-        </button>
-
-        <div className="dark-grid min-h-[92px] flex-1 border border-pine px-4 py-3 font-mono text-xs leading-relaxed text-mint">
-          {log.length === 0 && !running && (
-            <span className="text-mint/40">// inference trace will stream here …</span>
-          )}
-          {log.map((l, i) => (
-            <p key={i} className={i === log.length - 1 && running ? "type-caret" : ""}>
-              {l}
-            </p>
-          ))}
-        </div>
-      </div>
-
-      {/* results */}
-      {result && (
-        <div className="space-y-4 border-t border-dashed border-ink/20 pt-5">
-          <div className="flex items-center justify-between">
-            <h3 className="font-display text-sm font-extrabold uppercase tracking-wide">
-              Differential diagnosis <span className="text-inksoft">· run {result.meta.runId}</span>
-            </h3>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-teal">
-              multinomial NB · α={NB_ALPHA} · trained on {NB_MODEL.rows.toLocaleString()} rows
-            </span>
-          </div>
-
-          {(result.redFlagSymptoms.length > 0 || result.redFlags.length > 0) && (
-            <div className="border-2 border-alert bg-alert/10 p-3.5">
-              <p className="mb-2 flex items-center gap-2 font-display text-xs font-extrabold uppercase tracking-wider text-alert">
-                <Icon name="warn" className="h-4 w-4" /> Red flags detected — seek in-person care
-              </p>
-              {result.redFlagSymptoms.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {result.redFlagSymptoms.map((s) => (
-                    <span
-                      key={s}
-                      className="inline-flex items-center gap-1.5 border border-alert bg-alert px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-paper shadow-[2px_2px_0_0_rgba(140,47,39,0.55)]"
-                    >
-                      <Icon name="warn" className="h-3 w-3" /> {s}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {result.redFlags.length > 0 && (
-                <ul className="mt-2 space-y-1 pl-6 text-[13px] text-alertdeep">
-                  {result.redFlags.map((f) => (
-                    <li key={f} className="list-disc">
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <p className="mt-3 border-l-4 border-alert bg-paper px-3 py-2 font-mono text-[11px] font-bold tracking-wide text-alertdeep">
-                DO NOT RELY ON AN AI ESTIMATE FOR IT.{" "}
-                <span className="font-semibold normal-case tracking-normal text-inksoft">
-                  Red-flag symptoms must be evaluated by a clinician, in person.
-                </span>
-              </p>
-            </div>
-          )}
-
-          <ol className="space-y-3">
-            {result.scored.slice(0, 4).map((s, rank) => (
-              <li
-                key={s.disease.id}
-                className={`border p-3.5 transition-all duration-300 hover:-translate-y-0.5 ${
-                  rank === 0
-                    ? "border-teal bg-teal/8 shadow-[5px_5px_0_0_rgba(14,124,114,0.25)]"
-                    : "border-ink/15 bg-paper"
-                }`}
-              >
-                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <span className={`font-mono text-[10px] font-bold ${rank === 0 ? "text-teal" : "text-inksoft/60"}`}>
-                    #{rank + 1}
-                  </span>
-                  <span className="font-display text-base font-extrabold">{s.disease.name}</span>
-                  <span className="font-mono text-[10px] tracking-widest text-inksoft">ICD-10 {s.disease.code}</span>
-                  <span
-                    className={`ml-auto border px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-widest uppercase ${
-                      s.disease.severity === "High"
-                        ? "border-alert/40 text-alert"
-                        : s.disease.severity === "Moderate"
-                          ? "border-amber/50 text-amber"
-                          : "border-teal/40 text-teal"
-                    }`}
-                  >
-                    {s.disease.severity} risk
-                  </span>
-                </div>
-                <div className="mt-2 flex items-center gap-3">
-                  <div className="h-2 flex-1 bg-ink/10">
-                    <div
-                      className={`bar-fill h-full ${rank === 0 ? "bg-teal" : "bg-ink/35"}`}
-                      style={{ width: `${Math.min(99, s.confidence * 2.2)}%`, animationDelay: `${rank * 120}ms` }}
-                    />
-                  </div>
-                  <CountUp
-                    value={s.confidence}
-                    decimals={1}
-                    suffix="%"
-                    className={`w-16 text-right font-mono text-sm font-bold tabular-nums ${
-                      rank === 0 ? "text-teal" : "text-inksoft"
-                    }`}
-                  />
-                </div>
-                {rank === 0 && (
-                  <p className="mt-2.5 border-l-2 border-teal pl-3 text-[13px] leading-relaxed text-inksoft">
-                    {s.disease.blurb} <span className="font-semibold text-ink">Referral: {s.disease.specialty}.</span>
-                  </p>
-                )}
-              </li>
-            ))}
-          </ol>
-        </div>
-      )}
+      <button
+        onClick={analyze}
+        disabled={selected.size === 0}
+        className="group inline-flex w-full items-center justify-center gap-2 bg-alert px-6 py-3.5 font-display text-sm font-extrabold uppercase tracking-wider text-paper shadow-[5px_5px_0_0_rgba(11,47,45,1)] transition-all duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+          <path d="M9.5 3a3 3 0 0 0-3 3 3.2 3.2 0 0 0-2.4 5A3.2 3.2 0 0 0 6.5 16a3 3 0 0 0 3 3 2.8 2.8 0 0 0 2.5-1.5V4.5A3 3 0 0 0 9.5 3zM14.5 3a3 3 0 0 1 3 3 3.2 3.2 0 0 1 2.4 5 3.2 3.2 0 0 1-2.4 5 3 3 0 0 1-3 3 2.8 2.8 0 0 1-2.5-1.5V4.5A3 2.8 0 0 1 14.5 3z" />
+        </svg>
+        Run neural analysis
+      </button>
     </div>
   );
 }

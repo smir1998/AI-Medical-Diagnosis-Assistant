@@ -18,6 +18,7 @@ export interface TrainedModel {
   weights: number[][];
   biases: number[];
   classes: string[];
+  symptomVocab: string[];
   metrics: ModelMetrics;
   lossHistory: number[];
 }
@@ -43,7 +44,13 @@ export async function trainModel(options: TrainOptions): Promise<TrainedModel> {
   const { epochs, onEpoch } = options;
   const classes = DISEASE_SYMPTOM_MATRIX.map((d) => d.disease);
   const numClasses = classes.length;
-  const numFeatures = 70; // ~70 symptoms
+
+  // Build symptom vocabulary from actual dataset
+  const symptomSet = new Set<string>();
+  DISEASE_SYMPTOM_MATRIX.forEach((d) => d.symptoms.forEach((s) => symptomSet.add(s)));
+  const symptomVocab = Array.from(symptomSet).sort();
+  const numFeatures = symptomVocab.length;
+  const symptomToIndex = new Map(symptomVocab.map((s, i) => [s, i]));
 
   // Initialize weights and biases
   const weights: number[][] = Array.from({ length: numClasses }, () =>
@@ -51,14 +58,16 @@ export async function trainModel(options: TrainOptions): Promise<TrainedModel> {
   );
   const biases: number[] = Array.from({ length: numClasses }, () => 0);
 
-  // Prepare training data
+  // Prepare training data - encode actual symptom names
   const data = DISEASE_SYMPTOM_MATRIX.flatMap((d, labelIdx) =>
-    Array.from({ length: 50 }, () => ({
-      features: Array.from({ length: numFeatures }, (_, i) =>
-        d.symptoms.includes(`symptom_${i}`) ? 1 : 0
-      ),
-      label: labelIdx,
-    }))
+    Array.from({ length: 50 }, () => {
+      const features = new Array(numFeatures).fill(0);
+      d.symptoms.forEach((symptom) => {
+        const idx = symptomToIndex.get(symptom);
+        if (idx !== undefined) features[idx] = 1;
+      });
+      return { features, label: labelIdx };
+    })
   );
 
   // Shuffle and split
@@ -161,6 +170,7 @@ export async function trainModel(options: TrainOptions): Promise<TrainedModel> {
     weights,
     biases,
     classes,
+    symptomVocab,
     lossHistory: [], // Simplified for now
     metrics: {
       accuracy,
@@ -174,10 +184,12 @@ export async function trainModel(options: TrainOptions): Promise<TrainedModel> {
 }
 
 export function predictWithModel(model: TrainedModel, symptoms: string[]): Array<{ name: string; prob: number }> {
-  const numFeatures = 70;
-  const features = Array.from({ length: numFeatures }, (_, i) =>
-    symptoms.includes(`symptom_${i}`) ? 1 : 0
-  );
+  const symptomToIndex = new Map(model.symptomVocab.map((s, i) => [s, i]));
+  const features = new Array(model.symptomVocab.length).fill(0);
+  symptoms.forEach((symptom) => {
+    const idx = symptomToIndex.get(symptom);
+    if (idx !== undefined) features[idx] = 1;
+  });
 
   const logits = model.weights.map((w, c) =>
     w.reduce((sum, wj, j) => sum + wj * features[j], 0) + model.biases[c]

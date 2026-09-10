@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Synthetic teaching dermoscopy view of an atypical lesion with ABCDE warning features">
+  <defs>
+    <radialGradient id="skin" cx="50%" cy="46%" r="72%">
+      <stop offset="0%" stop-color="#dfae80"/>
+      <stop offset="70%" stop-color="#cd9a6b"/>
+      <stop offset="100%" stop-color="#b78357"/>
+    </radialGradient>
+    <radialGradient id="lesion" cx="42%" cy="40%" r="62%">
+      <stop offset="0%" stop-color="#4a2b14"/>
+      <stop offset="55%" stop-color="#3a2010"/>
+      <stop offset="100%" stop-color="#251207"/>
+    </radialGradient>
+    <radialGradient id="vig" cx="50%" cy="50%" r="50%">
+      <stop offset="60%" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="92%" stop-color="#000000" stop-opacity="0.88"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.96"/>
+    </radialGradient>
+    <filter id="pore">
+      <feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="2" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.35  0 0 0 0 0.22  0 0 0 0 0.12  0 0 0 0.10 0"/>
+    </filter>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+    <filter id="softer" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="10"/>
+    </filter>
+  </defs>
+
+  <!-- skin -->
+  <rect width="512" height="512" fill="url(#skin)"/>
+  <rect width="512" height="512" filter="url(#pore)"/>
+
+  <!-- atypical lesion: asymmetric outline, notched border -->
+  <path d="M258 156 C302 148 334 174 346 208 C372 220 378 256 358 282 C368 314 346 344 312 348 C302 376 266 386 240 368 C206 380 176 356 172 322 C146 306 140 270 160 246 C152 212 176 184 212 182 C224 162 242 152 258 156 Z"
+    fill="url(#lesion)" filter="url(#soft)"/>
+
+  <!-- pseudopods / radial streaming at one pole (asymmetry) -->
+  <g fill="#2a1608" opacity="0.85" filter="url(#soft)">
+    <path d="M346 208 L376 196 L352 224 Z"/>
+    <path d="M358 282 L390 292 L356 300 Z"/>
+    <path d="M172 322 L146 342 L176 336 Z"/>
+  </g>
+
+  <!-- black blotch -->
+  <ellipse cx="300" cy="226" rx="34" ry="26" fill="#0d0703" opacity="0.95" filter="url(#soft)"/>
+
+  <!-- blue-white veil hint -->
+  <ellipse cx="252" cy="286" rx="44" ry="30" fill="#5d6f80" opacity="0.4" filter="url(#softer)"/>
+
+  <!-- lighter tan regression areas -->
+  <ellipse cx="216" cy="222" rx="26" ry="18" fill="#8a5c33" opacity="0.75" filter="url(#soft)"/>
+  <ellipse cx="284" cy="330" rx="22" ry="15" fill="#93613a" opacity="0.6" filter="url(#soft)"/>
+
+  <!-- irregular streaky network -->
+  <g stroke="#1c0f05" stroke-width="2.5" fill="none" opacity="0.6" filter="url(#soft)">
+    <path d="M196 250 Q236 236 268 250 Q300 264 322 292"/>
+    <path d="M206 300 Q246 286 282 296 Q310 304 326 322"/>
+    <path d="M232 192 Q254 224 250 258 Q246 290 258 318"/>
+  </g>
+
+  <!-- dermoscope vignette + lens ring -->
+  <rect width="512" height="512" fill="url(#vig)"/>
+  <circle cx="256" cy="256" r="216" fill="none" stroke="#0b0b0b" stroke-width="30"/>
+  <circle cx="256" cy="256" r="200" fill="none" stroke="#4a4a4a" stroke-width="2" opacity="0.8"/>
+
+  <!-- lens glare -->
+  <ellipse cx="182" cy="142" rx="62" ry="20" fill="#ffffff" opacity="0.10" transform="rotate(-24 182 142)"/>
+</svg>

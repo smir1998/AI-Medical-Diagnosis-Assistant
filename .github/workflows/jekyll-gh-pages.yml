@@ -1,0 +1,27 @@
+# ============================================================================
+# INTENTIONALLY INERT — DO NOT RE-ENABLE.
+#
+# This file exists ONLY to overwrite GitHub's default "Deploy Jekyll with
+# GitHub Pages dependencies preinstalled" workflow, which fights the Vite
+# pipeline (deploy.yml) for the same github-pages environment and serves the
+# repo root — producing a blank site even on green runs.
+#
+# The single real deployer is .github/workflows/deploy.yml.
+# ============================================================================
+
+name: Deploy Jekyll with GitHub Pages dependencies preinstalled
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  noop:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disabled by design
+        run: |
+          echo "This Jekyll deployer is intentionally inert."
+          echo "The real Pages pipeline is .github/workflows/deploy.yml (Vite)."

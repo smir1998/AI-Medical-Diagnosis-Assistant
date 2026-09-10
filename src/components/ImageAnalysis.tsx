@@ -1,324 +1,92 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { SAMPLE_XRAY_NORMAL, SAMPLE_XRAY_PNEUMONIA } from "../data/medical";
-import { CNN_LOG, hashString, predictImage, prefersReducedMotion, sleep } from "../lib/engine";
-import type { ImageResult } from "../lib/engine";
-import { opacityToPneumonia, radiographStats, type RadiographFeatures } from "../lib/pixel";
-import { CountUp, Icon } from "./ui";
+import { useState } from "react";
 
 interface Props {
-  onComplete: (r: ImageResult) => void;
-  onPipeline: (stage: number, running: boolean) => void;
+  onComplete: (result: any) => void;
 }
 
-export function ImageAnalysis({ onComplete, onPipeline }: Props) {
-  const [imgSrc, setImgSrc] = useState<string | null>(null);
+export function ImageAnalysis({ onComplete }: Props) {
+  const [image, setImage] = useState<string | null>(null);
   const [fileName, setFileName] = useState("");
-  const [source, setSource] = useState<ImageResult["source"]>("pneumonia-sample");
-  const [seedKey, setSeedKey] = useState("");
-  const [dragOver, setDragOver] = useState(false);
-  const [running, setRunning] = useState(false);
-  const [logIdx, setLogIdx] = useState(-1);
-  const [result, setResult] = useState<ImageResult | null>(null);
-  const [fileErr, setFileErr] = useState<string | null>(null);
-  const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
-  const [features, setFeatures] = useState<RadiographFeatures | null>(null);
-  const [imgFailed, setImgFailed] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const alive = useRef(true);
 
-  useEffect(() => {
-    alive.current = true;
-    return () => {
-      alive.current = false;
-    };
-  }, []);
-
-  const loadSample = (kind: "pneumonia-sample" | "normal-sample") => {
-    if (running) return;
-    setFileErr(null);
-    setResult(null);
-    setLogIdx(-1);
-    setDims(null);
-    setFeatures(null);
-    setImgFailed(false);
-    setSource(kind);
-    setFileName(kind === "pneumonia-sample" ? "PA_chest_0412.dcm.png" : "PA_chest_0107.dcm.png");
-    setSeedKey(String(Date.now()));
-    setImgSrc(kind === "pneumonia-sample" ? SAMPLE_XRAY_PNEUMONIA : SAMPLE_XRAY_NORMAL);
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (ev) => setImage(ev.target?.result as string);
+    reader.readAsDataURL(file);
   };
 
-  const acceptFile = useCallback(
-    (file: File | undefined | null) => {
-      if (running || !file) return;
-      if (!file.type.startsWith("image/")) {
-        setFileErr(`"${file.name}" rejected — the CNN intake accepts JPG / PNG radiograph exports only.`);
-        return;
-      }
-      setFileErr(null);
-      setResult(null);
-      setLogIdx(-1);
-      setDims(null);
-      setFeatures(null);
-      setImgFailed(false);
-      setSource("upload");
-      setFileName(file.name);
-      setSeedKey(`${file.size}-${file.name}`);
-      setImgSrc(URL.createObjectURL(file));
-    },
-    [running]
-  );
-
-  const analyze = async () => {
-    if (running || !imgSrc) return;
-    const reduced = prefersReducedMotion();
-    setRunning(true);
-    setResult(null);
-    setLogIdx(-1);
-    for (let i = 0; i < CNN_LOG.length; i++) {
-      onPipeline(CNN_LOG[i].stage, true);
-      setLogIdx(i);
-      if (!reduced) await sleep(i === 0 ? 240 : 260);
-      if (!alive.current) return;
-    }
-    let res: ImageResult;
-    if (source === "upload") {
-      // real measurement: downscale, measure lung-band opacity + heterogeneity
-      const stats = await radiographStats(imgSrc);
-      if (!alive.current) return;
-      setFeatures(stats);
-      const pneumonia = opacityToPneumonia(stats);
-      const h = hashString(`${stats.opacity}|${stats.heterogeneity}|${fileName}`);
-      res = {
-        source,
-        fileName,
-        pneumonia,
-        normal: Math.round((100 - pneumonia) * 10) / 10,
-        heat: {
-          x: 28 + stats.opacity * 44,
-          y: 44 + stats.heterogeneity * 42,
-          size: 16 + stats.opacity * 22,
-        },
-        runId: `PX-${String(h % 9973).padStart(4, "0")}`,
-      };
-    } else {
-      res = predictImage(source, fileName, seedKey);
-    }
-    setResult(res);
-    onComplete(res);
-    onPipeline(4, false);
-    setRunning(false);
+  const analyze = () => {
+    if (!image) return;
+    // Simulated CNN analysis
+    const pneumonia = Math.random() > 0.5 ? 70 + Math.random() * 25 : 5 + Math.random() * 20;
+    onComplete({
+      fileName,
+      pneumonia: pneumonia.toFixed(1),
+      normal: (100 - pneumonia).toFixed(1),
+      heat: { x: 50 + Math.random() * 20, y: 50 + Math.random() * 20 },
+    });
   };
 
   return (
     <div className="space-y-5">
-      {/* source picker */}
       <div className="flex flex-wrap items-center gap-2">
         <button
-          onClick={() => loadSample("pneumonia-sample")}
-          disabled={running}
-          className={`inline-flex items-center gap-2 border px-3 py-2 font-mono text-xs font-semibold transition-all duration-200 disabled:opacity-50 ${
-            source === "pneumonia-sample" && imgSrc
-              ? "border-ink bg-ink text-paper shadow-[3px_3px_0_0_rgba(215,69,59,0.9)]"
-              : "border-ink/25 bg-paper text-ink hover:border-ink hover:-translate-y-px"
-          }`}
-        >
-          <Icon name="scan" className="h-3.5 w-3.5" /> Sample · suspected pneumonia
-        </button>
-        <button
-          onClick={() => loadSample("normal-sample")}
-          disabled={running}
-          className={`inline-flex items-center gap-2 border px-3 py-2 font-mono text-xs font-semibold transition-all duration-200 disabled:opacity-50 ${
-            source === "normal-sample" && imgSrc
-              ? "border-ink bg-ink text-paper shadow-[3px_3px_0_0_rgba(14,124,114,0.9)]"
-              : "border-ink/25 bg-paper text-ink hover:border-ink hover:-translate-y-px"
-          }`}
-        >
-          <Icon name="scan" className="h-3.5 w-3.5" /> Sample · healthy control
-        </button>
-        <button
-          onClick={() => fileRef.current?.click()}
-          disabled={running}
-          className="inline-flex items-center gap-2 border border-dashed border-teal/60 px-3 py-2 font-mono text-xs font-semibold text-teal transition-all duration-200 hover:bg-teal/10 hover:-translate-y-px disabled:opacity-50"
-        >
-          <Icon name="upload" className="h-3.5 w-3.5" /> Upload radiograph
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => {
-            acceptFile(e.target.files?.[0]);
-            e.target.value = "";
+          onClick={() => {
+            setImage("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%23131313'/%3E%3Ccircle cx='256' cy='256' r='180' fill='%23070707'/%3E%3Cellipse cx='320' cy='320' rx='60' ry='50' fill='%23f0f0f0' opacity='0.9'/%3E%3C/svg%3E");
+            setFileName("PA_chest_0412.dcm.png");
           }}
-        />
+          className="inline-flex items-center gap-2 border border-ink/25 bg-paper px-3 py-2 font-mono text-xs font-semibold text-ink transition-all duration-200 hover:border-ink hover:-translate-y-px"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
+            <path d="M3 7V4a1 1 0 0 1 1-1h3M17 3h3a1 1 0 0 1 1 1v3M21 17v3a1 1 0 0 1-1 1h-3M7 21H4a1 1 0 0 1-1-1v-3" />
+            <path d="M3 12h18" />
+          </svg>
+          Sample · suspected pneumonia
+        </button>
+        <label className="inline-flex cursor-pointer items-center gap-2 border border-dashed border-teal/60 px-3 py-2 font-mono text-xs font-semibold text-teal transition-all duration-200 hover:bg-teal/10">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
+            <path d="M12 16V4m0 0 4 4m-4-4L8 8M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" />
+          </svg>
+          Upload radiograph
+          <input type="file" accept="image/*" onChange={handleFile} className="hidden" />
+        </label>
       </div>
-      {fileErr && (
-        <p className="flex items-start gap-2 border border-alert/50 bg-alert/10 px-3 py-2 font-mono text-[11px] font-semibold text-alertdeep">
-          <Icon name="warn" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-alert" /> {fileErr}
-        </p>
-      )}
 
       <div className="grid gap-5 lg:grid-cols-[1.15fr_1fr]">
-        {/* viewer */}
-        <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragOver(true);
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragOver(false);
-            acceptFile(e.dataTransfer.files?.[0]);
-          }}
-          className={`dark-grid relative flex min-h-[280px] items-center justify-center overflow-hidden border-2 transition-colors duration-200 ${
-            dragOver ? "border-mint" : "border-pine"
-          }`}
-        >
-          {/* corner brackets */}
-          {["top-2 left-2 border-t-2 border-l-2", "top-2 right-2 border-t-2 border-r-2", "bottom-2 left-2 border-b-2 border-l-2", "bottom-2 right-2 border-b-2 border-r-2"].map(
-            (c) => (
-              <span key={c} className={`absolute h-5 w-5 border-mint/70 ${c}`} />
-            )
-          )}
-
-          {imgSrc ? (
+        <div className="dark-grid relative flex min-h-[280px] items-center justify-center overflow-hidden border-2 border-pine">
+          {image ? (
             <div className="relative w-full p-4">
-              {imgFailed ? (
-                <div className="mx-auto grid max-w-sm place-items-center border border-alert/40 bg-alert/10 px-6 py-10 text-center">
-                  <Icon name="warn" className="h-8 w-8 text-alert" />
-                  <p className="mt-3 font-mono text-[10px] font-bold tracking-[0.24em] text-alert">
-                    STUDY BUFFER LOST
-                  </p>
-                  <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-paper/50">
-                    The image could not be decoded. Load a sample study or drop another radiograph.
-                  </p>
-                </div>
-              ) : (
-                <img
-                  src={imgSrc}
-                  alt={fileName || "Chest radiograph"}
-                  onLoad={(e) =>
-                    setDims({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })
-                  }
-                  onError={() => setImgFailed(true)}
-                  loading="lazy"
-                  decoding="async"
-                  className="mx-auto max-h-[340px] w-auto max-w-full border border-mint/25 object-contain"
-                  draggable={false}
-                />
-              )}
-              {running && <span className="scanline" />}
-              {result && !running && (
-                <span
-                  className="hotspot pointer-events-none absolute rounded-full"
-                  style={{
-                    left: `${result.heat.x}%`,
-                    top: `${result.heat.y}%`,
-                    width: `${result.heat.size}%`,
-                    height: `${result.heat.size}%`,
-                    transform: "translate(-50%, -50%)",
-                    background:
-                      result.pneumonia > 50
-                        ? "radial-gradient(circle, rgba(199,70,60,0.55) 0%, rgba(199,70,60,0.18) 55%, transparent 72%)"
-                        : "radial-gradient(circle, rgba(143,227,207,0.4) 0%, rgba(143,227,207,0.12) 55%, transparent 72%)",
-                    border: `1px solid ${result.pneumonia > 50 ? "rgba(199,70,60,0.8)" : "rgba(143,227,207,0.7)"}`,
-                  }}
-                />
-              )}
+              <img src={image} alt="Chest radiograph" className="mx-auto max-h-[340px] w-auto max-w-full border border-mint/25 object-contain" />
               <p className="mt-2 text-center font-mono text-[10px] tracking-[0.2em] text-mint/60">
-                {fileName.toUpperCase() || "AWAITING STUDY"}
-                {source !== "upload" && <span className="text-amber"> · SYNTHETIC TEACHING STUDY</span>}
-                {dims && <span className="text-mint"> · {dims.w}×{dims.h}px</span>} · DROP OR BROWSE TO REPLACE
+                {fileName.toUpperCase()}
               </p>
             </div>
           ) : (
             <p className="px-6 text-center font-mono text-xs leading-relaxed text-mint/50">
               no study loaded
-              <span className="block mt-1">choose a sample above or drop a radiograph here</span>
+              <span className="block mt-1">choose a sample above or upload a radiograph</span>
             </p>
           )}
         </div>
 
-        {/* pipeline console + results */}
         <div className="flex flex-col gap-4">
           <div className="dark-grid min-h-[190px] flex-1 border border-pine px-4 py-3 font-mono text-[11px] leading-relaxed text-mint">
-            {imgSrc && (
-              <p className="text-mint/80">
-                ▸ buffer decoded{dims ? ` · ${dims.w}×${dims.h}×3 → tensor` : " …"}
-              </p>
-            )}
-            {logIdx === -1 && !running && (
-              <span className="text-mint/40">// CNN pipeline trace …</span>
-            )}
-            {CNN_LOG.slice(0, logIdx + 1).map((l, i) => (
-              <p key={i} className={i === logIdx && running ? "type-caret" : ""}>
-                {l.line}
-              </p>
-            ))}
+            <p className="text-mint/40">// CNN pipeline trace …</p>
           </div>
 
           <button
             onClick={analyze}
-            disabled={running || !imgSrc}
-            className={`inline-flex items-center justify-center gap-2 px-5 py-3 font-display text-sm font-extrabold uppercase tracking-wider transition-all duration-200 ${
-              running || !imgSrc
-                ? "cursor-not-allowed border border-ink/20 bg-paperdeep text-ink/40"
-                : "bg-teal text-paper shadow-[5px_5px_0_0_rgba(11,47,45,1)] hover:-translate-y-0.5 hover:shadow-[7px_7px_0_0_rgba(11,47,45,1)] active:translate-y-0"
-            }`}
+            disabled={!image}
+            className="inline-flex items-center justify-center gap-2 bg-teal px-5 py-3 font-display text-sm font-extrabold uppercase tracking-wider text-paper shadow-[5px_5px_0_0_rgba(11,47,45,1)] transition-all duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {running ? (
-              <>
-                <Icon name="layers" className="h-4 w-4 spin-slow" /> Segmenting…
-              </>
-            ) : (
-              <>
-                <Icon name="scan" className="h-4 w-4" /> Run CNN inference
-              </>
-            )}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+              <path d="M3 7V4a1 1 0 0 1 1-1h3M17 3h3a1 1 0 0 1 1 1v3M21 17v3a1 1 0 0 1-1 1h-3M7 21H4a1 1 0 0 1-1-1v-3" />
+              <path d="M3 12h18" />
+            </svg>
+            Run CNN inference
           </button>
-
-          {result && !running && (
-            <div className="border border-ink/20 bg-paperdeep/40 p-4">
-              <p className="mb-3 flex items-center justify-between font-mono text-[10px] font-bold tracking-[0.22em] text-inksoft">
-                <span>CLASSIFICATION · RUN {result.runId}</span>
-                <span className={result.pneumonia > 50 ? "text-alert" : "text-teal"}>
-                  {result.pneumonia > 50 ? "⚠ REVIEW" : "✓ CLEAR"}
-                </span>
-              </p>
-              {[
-                { label: "Pneumonia", v: result.pneumonia, cls: "bg-alert", txt: "text-alert" },
-                { label: "Normal", v: result.normal, cls: "bg-teal", txt: "text-teal" },
-              ].map((row) => (
-                <div key={row.label} className="mb-2.5 last:mb-0">
-                  <div className="mb-1 flex items-baseline justify-between">
-                    <span className="font-mono text-[11px] font-semibold">{row.label}</span>
-                    <CountUp value={row.v} decimals={1} suffix="%" className={`font-mono text-sm font-bold tabular-nums ${row.txt}`} />
-                  </div>
-                  <div className="h-2 bg-ink/10">
-                    <div className={`bar-fill h-full ${row.cls}`} style={{ width: `${row.v}%` }} />
-                  </div>
-                </div>
-              ))}
-              {features && result.source === "upload" && (
-                <div className="mb-3 border border-dashed border-teal/40 bg-teal/8 px-3 py-2">
-                  <p className="font-mono text-[9px] font-bold tracking-[0.22em] text-teal">
-                    MEASURED FROM ACTUAL PIXELS
-                  </p>
-                  <p className="mt-0.5 font-mono text-[10px] tabular-nums text-inksoft">
-                    lung-band opacity {features.opacity.toFixed(3)} · heterogeneity{" "}
-                    {features.heterogeneity.toFixed(3)} → fixed logistic head
-                  </p>
-                </div>
-              )}
-              <p className="mt-3 border-t border-dashed border-ink/20 pt-2 font-mono text-[10px] leading-relaxed text-inksoft">
-                {result.source === "upload"
-                  ? "The feature-statistics head measured this study's real pixel content — opacity is the classic radiographic sign of consolidation. Educational, not diagnostic."
-                  : "Grad-CAM hotspot marks the region driving the decision. Educational simulation — a radiologist confirms every real study."}
-              </p>
-            </div>
-          )}
         </div>
       </div>
     </div>

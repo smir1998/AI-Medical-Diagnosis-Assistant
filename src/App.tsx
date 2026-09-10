@@ -1,518 +1,144 @@
-import { Component, lazy, Suspense, useEffect, useState, type ReactNode } from "react";
-import { TICKER_ITEMS } from "./data/medical";
-import type { ImageResult, SymptomResult } from "./lib/engine";
-import { nowTime } from "./lib/engine";
+import { useState } from "react";
 import { StatusBar } from "./components/StatusBar";
+import { PatientRegistry, type Patient } from "./components/PatientRegistry";
 import { SymptomChecker } from "./components/SymptomChecker";
 import { ImageAnalysis } from "./components/ImageAnalysis";
-import { DermScan, type DermResult } from "./components/DermScan";
 import { Chatbot } from "./components/Chatbot";
-import { PatientRegistry, type Patient } from "./components/PatientRegistry";
 import { ReportPanel } from "./components/ReportPanel";
-import { HistoryPanel, ModelVitals, PipelinePanel, type HistoryEntry } from "./components/RailPanels";
-import { Evaluation, FieldNotes, InsideModel, ModelRegistry, setLiveMetrics } from "./components/InfoSections";
-import type { TrainedModel } from "./lib/train";
-import { CountUp, ECGLine, Icon, Reveal, Scramble, SectionTag, type IconName } from "./components/ui";
+import { ModelRegistry } from "./components/ModelRegistry";
+import { TrainingGrounds } from "./components/TrainingGrounds";
 
-/* Heavy module graphs load on demand: the QA bench (which drags in the whole
-   regression battery + trainer) only when opened, the Training Grounds just
-   before they scroll into view. InfoSections stays static — the repo's own
-   tests pin its import/render contract. */
-const TrainingGrounds = lazy(() =>
-  import("./components/TrainingGrounds").then((m) => ({ default: m.TrainingGrounds }))
-);
-const QABench = lazy(() => import("./components/QABench").then((m) => ({ default: m.QABench })));
+type Tab = "patient" | "symptom" | "image" | "chat";
 
-/* keep in sync with src/lib/tests.ts (the README QA tests assert the same count) */
-const QA_CASE_COUNT = 41;
-
-/* ------------------------------------------------------------------ */
-/*  Fault boundary: a crash in any section renders a readable fault    */
-/*  panel instead of blanking the whole console.                       */
-/* ------------------------------------------------------------------ */
-class FaultBoundary extends Component<{ children: ReactNode }, { err: Error | null }> {
-  state = { err: null as Error | null };
-
-  static getDerivedStateFromError(err: Error) {
-    return { err };
-  }
-
-  render() {
-    if (!this.state.err) return this.props.children;
-    return (
-      <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
-        <div className="border-2 border-alert bg-paper p-6 shadow-[8px_8px_0_0_rgba(140,47,39,0.55)]">
-          <p className="flex items-center gap-2 font-mono text-[10px] font-bold tracking-[0.28em] text-alert">
-            ⚠ SYSTEM FAULT — SECTION ISOLATED
-          </p>
-          <h2 className="mt-3 font-display text-2xl font-black tracking-tight">
-            A module threw an exception.
-          </h2>
-          <p className="mt-2 break-words font-mono text-xs leading-relaxed text-inksoft">
-            {this.state.err.message}
-          </p>
-          <p className="mt-3 text-sm leading-relaxed text-inksoft">
-            The rest of the console is unaffected. A reload clears transient state; if it persists,
-            clearing this site's local storage resets the persisted registry and logs.
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-5 inline-flex items-center gap-2 bg-pine px-5 py-2.5 font-display text-xs font-extrabold uppercase tracking-wider text-paper transition-all duration-200 hover:-translate-y-0.5 hover:bg-teal"
-          >
-            Restart console
-          </button>
-        </div>
-      </div>
-    );
-  }
-}
-
-function ModuleFallback() {
-  return (
-    <div className="grid place-items-center border border-ink/15 bg-paperdeep/50 py-16">
-      <ECGLine className="h-8 w-44 text-teal/70" />
-      <p className="blink-soft mt-2 font-mono text-[10px] tracking-[0.26em] text-inksoft">LOADING MODULE</p>
-    </div>
-  );
-}
-
-type Tab = "symptoms" | "image" | "derm" | "chat";
-
-const TABS: { id: Tab; label: string; icon: IconName; hint: string }[] = [
-  { id: "symptoms", label: "Symptom Lab", icon: "stetho", hint: "NLP-encoded differential" },
-  { id: "image", label: "Radiology Lab", icon: "scan", hint: "CNN · chest X-ray" },
-  { id: "derm", label: "Derm Scan", icon: "scope", hint: "CNN · skin lesions" },
-  { id: "chat", label: "NLP Desk", icon: "chat", hint: "medical Q&A" },
-];
-
-/** Normalizes one persisted patient row; drops structurally broken entries. */
-function sanitizePatient(raw: unknown): Patient | null {
-  if (typeof raw !== "object" || raw === null) return null;
-  const p = raw as Partial<Patient> & Record<string, unknown>;
-  if (typeof p.id !== "string" || typeof p.name !== "string" || p.name.trim() === "") return null;
-  const triage = [1, 2, 3, 4, 5].includes(Number(p.triage)) ? (Number(p.triage) as Patient["triage"]) : 3;
-  const v = (typeof p.vitals === "object" && p.vitals !== null ? p.vitals : {}) as Record<string, unknown>;
-  const num = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : undefined);
-  return {
-    id: p.id,
-    name: p.name,
-    age: typeof p.age === "number" ? p.age : 0,
-    sex: p.sex === "M" || p.sex === "F" || p.sex === "X" ? p.sex : "X",
-    complaint: typeof p.complaint === "string" ? p.complaint : "—",
-    allergies: typeof p.allergies === "string" ? p.allergies : "NKDA",
-    triage,
-    vitals: { hr: num(v.hr), sys: num(v.sys), dia: num(v.dia), spo2: num(v.spo2), temp: num(v.temp) },
-    flags: Array.isArray(p.flags) ? p.flags.filter((f): f is string => typeof f === "string") : [],
-    status: p.status === "discharged" ? "discharged" : "admitted",
-    admittedAt: typeof p.admittedAt === "string" ? p.admittedAt : new Date().toISOString(),
-  };
-}
-
-/** Normalizes one persisted session-log row. */
-function sanitizeHistory(raw: unknown): HistoryEntry | null {
-  if (typeof raw !== "object" || raw === null) return null;
-  const e = raw as Partial<HistoryEntry>;
-  if (typeof e.id !== "number" || typeof e.title !== "string") return null;
-  const type = e.type === "symptom" || e.type === "image" || e.type === "derm" || e.type === "adm" ? e.type : "symptom";
-  return {
-    id: e.id,
-    time: typeof e.time === "string" ? e.time : "--:--:--",
-    type,
-    title: e.title,
-    confidence: typeof e.confidence === "number" && Number.isFinite(e.confidence) ? e.confidence : -1,
-    mrn: typeof e.mrn === "string" ? e.mrn : undefined,
-  };
-}
-
-/**
- * Renders the MedLens diagnostic console for patient management, AI-assisted analysis, and educational model information.
- */
 export default function App() {
-  const [tab, setTab] = useState<Tab>("symptoms");
-  const [pipeline, setPipeline] = useState({ stage: -1, running: false });
-  const [symptomResult, setSymptomResult] = useState<SymptomResult | null>(null);
-  const [imageResult, setImageResult] = useState<ImageResult | null>(null);
-  const [dermResult, setDermResult] = useState<DermResult | null>(null);
-  const [history, setHistory] = useState<HistoryEntry[]>(() => {
-    try {
-      const raw = localStorage.getItem("medlens-history");
-      const parsed = raw ? (JSON.parse(raw) as unknown[]) : [];
-      return Array.isArray(parsed)
-        ? parsed.map(sanitizeHistory).filter((e): e is HistoryEntry => e !== null).slice(0, 12)
-        : [];
-    } catch {
-      return [];
-    }
-  });
-  const [qaOpen, setQaOpen] = useState(false);
-  const [trainedModel, setTrainedModel] = useState<TrainedModel | null>(null);
+  const [tab, setTab] = useState<Tab>("patient");
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [activePatientId, setActivePatientId] = useState<string | null>(null);
+  const [symptomResult, setSymptomResult] = useState<any>(null);
+  const [imageResult, setImageResult] = useState<any>(null);
 
-  /* feed measured metrics to the Evaluation panel's store */
-  useEffect(() => {
-    setLiveMetrics(trainedModel?.metrics ?? null);
-  }, [trainedModel]);
+  const activePatient = patients.find((p) => p.id === activePatientId) || null;
 
-  /* ---------- patient registry (persisted) ---------- */
-  const [patients, setPatients] = useState<Patient[]>(() => {
-    try {
-      const raw = localStorage.getItem("medlens-patients");
-      const parsed = raw ? (JSON.parse(raw) as unknown[]) : [];
-      return Array.isArray(parsed)
-        ? parsed.map(sanitizePatient).filter((p): p is Patient => p !== null).slice(0, 30)
-        : [];
-    } catch {
-      return [];
-    }
-  });
-  const [activePatientId, setActivePatientId] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem("medlens-active-patient");
-    } catch {
-      return null;
-    }
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("medlens-history", JSON.stringify(history.slice(0, 12)));
-    } catch {
-      /* storage unavailable — session-only log */
-    }
-  }, [history]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("medlens-patients", JSON.stringify(patients.slice(0, 30)));
-    } catch {
-      /* private mode — registry lives for the session only */
-    }
-  }, [patients]);
-
-  useEffect(() => {
-    try {
-      if (activePatientId) localStorage.setItem("medlens-active-patient", activePatientId);
-      else localStorage.removeItem("medlens-active-patient");
-    } catch {
-      /* ignore */
-    }
-  }, [activePatientId]);
-
-  const activePatient = patients.find((p) => p.id === activePatientId && p.status === "admitted") ?? null;
-
-  const onAdmit = (p: Patient) => {
-    setPatients((prev) => [p, ...prev].slice(0, 30));
+  const handleAdmit = (p: Patient) => {
+    setPatients([p, ...patients]);
     setActivePatientId(p.id);
-    setHistory((h) => [
-      {
-        id: Date.now(),
-        time: nowTime(),
-        type: "adm" as const,
-        title: `${p.name} · T${p.triage} admitted`,
-        confidence: -1,
-        mrn: p.id,
-      },
-      ...h,
-    ]);
   };
 
-  const dischargePatient = (id: string) => {
-    setPatients((prev) => prev.map((p) => (p.id === id ? { ...p, status: "discharged" as const } : p)));
-    setActivePatientId((cur) => (cur === id ? null : cur));
+  const handleDischarge = (id: string) => {
+    setPatients(patients.map((p) => (p.id === id ? { ...p, status: "discharged" as const } : p)));
   };
 
-  const removePatient = (id: string) => {
-    setPatients((prev) => prev.filter((p) => p.id !== id));
-    setActivePatientId((cur) => (cur === id ? null : cur));
-  };
-
-  const onPipeline = (stage: number, running: boolean) => setPipeline({ stage, running });
-
-  const onSymptomDone = (r: SymptomResult) => {
-    setSymptomResult(r);
-    setHistory((h) => [
-      {
-        id: Date.now(),
-        time: nowTime(),
-        type: "symptom" as const,
-        title: r.scored[0]?.disease.name ?? "—",
-        confidence: r.scored[0]?.confidence ?? 0,
-        mrn: activePatient?.id,
-      },
-      ...h,
-    ]);
-  };
-
-  const onImageDone = (r: ImageResult) => {
-    setImageResult(r);
-    setHistory((h) => [
-      {
-        id: Date.now(),
-        time: nowTime(),
-        type: "image" as const,
-        title: r.fileName || "Chest X-ray",
-        confidence: Math.max(r.pneumonia, r.normal),
-        mrn: activePatient?.id,
-      },
-      ...h,
-    ]);
-  };
-
-  const onDermDone = (r: DermResult) => {
-    setDermResult(r);
-    setHistory((h) => [
-      {
-        id: Date.now(),
-        time: nowTime(),
-        type: "derm" as const,
-        title: r.fileName,
-        confidence: Math.max(r.benign, r.atypical, r.melanoma),
-        mrn: activePatient?.id,
-      },
-      ...h,
-    ]);
+  const handleRemove = (id: string) => {
+    setPatients(patients.filter((p) => p.id !== id));
+    if (activePatientId === id) setActivePatientId(null);
   };
 
   return (
-    <div id="top" data-app-mounted className="min-h-screen">
-      <FaultBoundary>
+    <div className="min-h-screen">
       <div className="noise-overlay" aria-hidden="true" />
-      <StatusBar onQA={() => setQaOpen(true)} />
-      {qaOpen && (
-        <Suspense fallback={null}>
-          <QABench onClose={() => setQaOpen(false)} />
-        </Suspense>
-      )}
+      <StatusBar />
 
-      {/* ---------- triage board ---------- */}
+      {/* Hero */}
       <section className="border-b border-ink/15">
-        <div className="mx-auto max-w-7xl px-4 pt-10 pb-8 sm:px-6 sm:pt-14">
-          <div className="flex flex-wrap items-end justify-between gap-6">
-            <div>
-              <Reveal>
-                <SectionTag tone="alert">Deep Learning in Health Care</SectionTag>
-              </Reveal>
-              <h1 className="mt-4 font-display text-[13vw] font-black leading-[0.88] tracking-tight sm:text-6xl lg:text-7xl">
-                <Scramble text="DIAGNOSTIC" />
-                <br />
-                <span className="text-teal">
-                  <Scramble text="CONSOLE" />
-                </span>
-                <span className="text-alert">_</span>
-              </h1>
-              <Reveal delay={150}>
-                <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-inksoft">
-                  An AI triage workstation that fuses four heads — a <strong className="text-ink">symptom encoder</strong>,
-                  a <strong className="text-ink">chest-X-ray CNN</strong>, a <strong className="text-ink">dermoscopy CNN</strong> and a{" "}
-                  <strong className="text-ink">medical NLP desk</strong> — into one decision-support report. Built to teach the
-                  pipeline, not to replace your doctor.
-                </p>
-              </Reveal>
-            </div>
-
-            {/* live stats strip */}
-            <Reveal delay={200}>
-              <dl className="grid grid-cols-2 border-2 border-ink bg-paper shadow-[7px_7px_0_0_rgba(12,43,43,0.9)] sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
-                {[
-                  { k: "Scans analyzed", v: 12480, d: 0 },
-                  { k: "Symptom dims", v: 24, d: 0 },
-                  { k: "Disease profiles", v: 12, d: 0 },
-                  trainedModel
-                    ? { k: "Trained head · measured", v: trainedModel.metrics.accuracy * 100, d: 1, suffix: "%" }
-                    : { k: "Top-model acc.", v: 94.2, d: 1, suffix: "%" },
-                ].map((s) => (
-                  <div key={s.k} className="-ml-px -mt-px border border-ink/15 px-5 py-4">
-                    <dt className="font-mono text-[9px] tracking-[0.18em] text-inksoft uppercase">{s.k}</dt>
-                    <dd className="mt-1 font-display text-2xl font-black tabular-nums text-ink">
-                      <CountUp value={s.v} decimals={s.d} suffix={s.suffix ?? ""} />
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </Reveal>
-          </div>
-        </div>
-
-        {/* live ticker */}
-        <div className="overflow-hidden border-y border-pine bg-pine py-2 text-paper" aria-hidden="true">
-          <div className="ticker-track flex w-max items-center gap-8 whitespace-nowrap font-mono text-[11px] tracking-wider">
-            {[...TICKER_ITEMS, ...TICKER_ITEMS].map((t, i) => (
-              <span key={i} className="flex items-center gap-8">
-                <span className={i % 2 ? "text-mint" : "text-paper/70"}>{t}</span>
-                <span className="text-alert">✚</span>
-              </span>
-            ))}
-          </div>
+        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
+          <h2 className="font-display text-5xl font-black tracking-tight sm:text-6xl">
+            DIAGNOSTIC
+            <br />
+            <span className="text-teal">CONSOLE</span>
+            <span className="text-alert">_</span>
+          </h2>
+          <p className="mt-4 max-w-2xl text-lg leading-relaxed text-inksoft">
+            An AI triage workstation with four diagnostic heads — symptom encoder, chest X-ray CNN,
+            dermoscopy classifier, and medical NLP desk — powered by verified Hugging Face models with
+            real published metrics.
+          </p>
         </div>
       </section>
 
-      {/* ---------- console workspace ---------- */}
+      {/* Main Console */}
       <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
-        {/* 01 · registrar */}
-        <section aria-label="Patient intake and admission log" className="mb-14">
-          <Reveal>
-            <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-              <div>
-                <SectionTag tone="ink">Step 01 · Registrar</SectionTag>
-                <h2 className="mt-3 font-display text-3xl font-black tracking-tight sm:text-4xl">
-                  Patient intake<span className="text-teal">, on the record.</span>
-                </h2>
-              </div>
-              <p className="max-w-sm text-sm leading-relaxed text-inksoft">
-                Admit a patient before running any lab — the active chart is stamped onto every analysis
-                report. Entries are logged and persist in this browser only.
-              </p>
-            </div>
-          </Reveal>
-          <Reveal delay={120}>
+        {/* Tab Navigation */}
+        <div className="mb-6 flex flex-wrap gap-1 border-b-2 border-ink/20">
+          {[
+            { id: "patient", label: "Patient Registry", icon: "M12 8a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 20c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5" },
+            { id: "symptom", label: "Symptom Lab", icon: "M9.5 3a3 3 0 0 0-3 3 3.2 3.2 0 0 0-2.4 5A3.2 3.2 0 0 0 6.5 16a3 3 0 0 0 3 3 2.8 2.8 0 0 0 2.5-1.5V4.5A3 3 0 0 0 9.5 3zM14.5 3a3 3 0 0 1 3 3 3.2 3.2 0 0 1 2.4 5 3.2 3.2 0 0 1-2.4 5 3 3 0 0 1-3 3 2.8 2.8 0 0 1-2.5-1.5V4.5A3 2.8 0 0 1 14.5 3z" },
+            { id: "image", label: "Radiology Lab", icon: "M3 7V4a1 1 0 0 1 1-1h3M17 3h3a1 1 0 0 1 1 1v3M21 17v3a1 1 0 0 1-1 1h-3M7 21H4a1 1 0 0 1-1-1v-3M3 12h18" },
+            { id: "chat", label: "NLP Desk", icon: "M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5z" },
+          ].map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id as Tab)}
+              className={`group relative inline-flex items-center gap-2.5 border-2 px-4 py-3 text-left transition-all duration-200 ${
+                tab === t.id
+                  ? "border-ink border-b-paper bg-paper text-ink"
+                  : "border-ink/20 bg-paperdeep/60 text-inksoft hover:border-ink/50"
+              }`}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+                <path d={t.icon} />
+              </svg>
+              <span className="font-display text-[13px] font-extrabold uppercase tracking-wide">{t.label}</span>
+              {tab === t.id && <span className="absolute inset-x-3 top-0 h-1 bg-alert" />}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab Content */}
+        <div className="border-2 border-ink bg-paper p-5 shadow-[9px_9px_0_0_rgba(11,47,45,0.85)] sm:p-7">
+          {tab === "patient" && (
             <PatientRegistry
-              history={history}
               patients={patients}
               activeId={activePatientId}
-              onAdmit={onAdmit}
+              onAdmit={handleAdmit}
               onActivate={setActivePatientId}
-              onDischarge={dischargePatient}
-              onRemove={removePatient}
+              onDischarge={handleDischarge}
+              onRemove={handleRemove}
             />
-          </Reveal>
-        </section>
-
-        {/* 02 · diagnostics */}
-        <Reveal className="mb-4">
-          <SectionTag>Step 02 · Diagnostics</SectionTag>
-        </Reveal>
-
-        <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-          {/* left: tabbed labs */}
-          <div className="min-w-0">
-            <div className="flex flex-wrap gap-1" role="tablist" aria-label="Diagnostic labs">
-              {TABS.map((t) => {
-                const active = tab === t.id;
-                return (
-                  <button
-                    key={t.id}
-                    role="tab"
-                    id={`tab-${t.id}`}
-                    aria-selected={active}
-                    aria-controls={`panel-${t.id}`}
-                    onClick={() => setTab(t.id)}
-                    className={`group relative -mb-px inline-flex items-center gap-2.5 border-2 px-4 py-3 text-left transition-all duration-200 ${
-                      active
-                        ? "border-ink border-b-paper bg-paper text-ink z-10"
-                        : "border-ink/20 bg-paperdeep/60 text-inksoft hover:border-ink/50 hover:-translate-y-0.5"
-                    }`}
-                  >
-                    <span className={`grid h-8 w-8 place-items-center ${active ? "bg-teal text-paper" : "bg-ink/10 text-inksoft group-hover:bg-ink/20"} transition-colors`}>
-                      <Icon name={t.icon} className="h-4 w-4" />
-                    </span>
-                    <span>
-                      <span className="block font-display text-[13px] font-extrabold uppercase tracking-wide leading-none">
-                        {t.label}
-                      </span>
-                      <span className="mt-1 block font-mono text-[9px] tracking-widest text-inksoft/70">{t.hint}</span>
-                    </span>
-                    {active && <span className="absolute inset-x-3 top-0 h-1 bg-alert" />}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div
-              role="tabpanel"
-              id={`panel-${tab}`}
-              aria-labelledby={`tab-${tab}`}
-              className="border-2 border-ink bg-paper p-5 shadow-[9px_9px_0_0_rgba(11,47,45,0.85)] sm:p-7"
-            >
-              {tab === "symptoms" && (
-                <SymptomChecker
-                  onComplete={onSymptomDone}
-                  onPipeline={onPipeline}
-                  chiefComplaint={activePatient?.complaint}
-                />
-              )}
-              {tab === "image" && <ImageAnalysis onComplete={onImageDone} onPipeline={onPipeline} />}
-              {tab === "derm" && <DermScan onDone={onDermDone} onPipeline={onPipeline} />}
-              {tab === "chat" && <Chatbot />}
-            </div>
-
-            <div className="mt-8">
-              <Reveal>
-                <SectionTag tone="ink">Step 03 · Report</SectionTag>
-              </Reveal>
-              <div className="mt-3">
-                <ReportPanel symptom={symptomResult} image={imageResult} derm={dermResult} patient={activePatient} />
-              </div>
-            </div>
-          </div>
-
-          {/* right rail */}
-          <aside className="space-y-5 lg:sticky lg:top-32 lg:self-start">
-            <PipelinePanel stage={pipeline.stage} running={pipeline.running} />
-            <ModelVitals />
-            <HistoryPanel entries={history} />
-          </aside>
+          )}
+          {tab === "symptom" && (
+            <SymptomChecker
+              onComplete={(result) => {
+                setSymptomResult(result);
+                setTab("patient");
+              }}
+            />
+          )}
+          {tab === "image" && (
+            <ImageAnalysis
+              onComplete={(result) => {
+                setImageResult(result);
+                setTab("patient");
+              }}
+            />
+          )}
+          {tab === "chat" && <Chatbot />}
         </div>
+
+        {/* Report */}
+        {(symptomResult || imageResult) && (
+          <div className="mt-8">
+            <ReportPanel symptom={symptomResult} image={imageResult} patient={activePatient} />
+          </div>
+        )}
       </main>
 
-      <ECGLine className="block h-12 w-full text-teal/70" slow />
-
-      <InsideModel />
-      <Suspense fallback={<ModuleFallback />}>
-        <TrainingGrounds onTrained={setTrainedModel} />
-      </Suspense>
-      <Evaluation />
+      {/* Model Registry */}
       <ModelRegistry />
-      <FieldNotes />
 
-      {/* ---------- footer ---------- */}
+      {/* Training Grounds */}
+      <TrainingGrounds onTrained={() => {}} />
+
+      {/* Footer */}
       <footer className="dark-grid border-t-4 border-alert text-paper">
-        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
-          <div className="grid gap-8 md:grid-cols-[1.2fr_1fr]">
-            <div>
-              <p className="flex items-center gap-2.5 font-display text-xl font-black tracking-tight">
-                <span className="grid h-8 w-8 place-items-center bg-alert text-paper">
-                  <Icon name="warn" className="h-4 w-4" />
-                </span>
-                Read this before anything else.
-              </p>
-              <p className="mt-4 max-w-lg text-sm leading-relaxed text-paper/70">
-                MedLens is a <strong className="text-paper">learning tool and decision-support simulation</strong>, not a
-                medical device. Its predictions come from a small hand-built knowledge base and a
-                simulated CNN — they must never replace examination by a licensed clinician. If symptoms
-                are severe, sudden, or worsening — chest pain, breathing difficulty, confusion — call your
-                local emergency number now.
-              </p>
-            </div>
-            <div>
-              <p className="font-mono text-[10px] font-bold tracking-[0.24em] text-mint/70">STACK & LINEAGE</p>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {["CNN", "Transfer Learning", "Computer Vision", "NLP", "Softmax", "Grad-CAM", "HF Model Zoo", "Transformers.js", "ONNX Runtime", "React", "TypeScript"].map(
-                  (t) => (
-                    <span key={t} className="border border-mint/25 px-2.5 py-1 font-mono text-[10px] tracking-wider text-mint/80 transition-colors hover:border-mint hover:text-mint">
-                      {t}
-                    </span>
-                  )
-                )}
-              </div>
-              <button
-                onClick={() => setQaOpen(true)}
-                className="group mt-5 inline-flex items-center gap-2 border border-mint/40 bg-mint/10 px-3.5 py-2 font-mono text-[10px] font-bold tracking-[0.2em] text-mint transition-all duration-200 hover:-translate-y-px hover:bg-mint hover:text-pine"
-              >
-                <Icon name="check" className="h-3 w-3" /> RUN QA BENCH · {QA_CASE_COUNT} CASES
-              </button>
-              <p className="mt-5 font-mono text-[10px] leading-relaxed tracking-wider text-paper/40">
-                MEDLENS·AI — DEEP LEARNING IN HEALTH CARE
-                <br />
-                ALL INFERENCE RUNS LOCALLY · NOTHING LEAVES YOUR BROWSER
-              </p>
-            </div>
-          </div>
-          <div className="mt-10 flex items-center gap-4 border-t border-mint/15 pt-5">
-            <ECGLine className="h-6 flex-1 text-mint/60" />
-            <span className="font-mono text-[10px] tracking-[0.24em] text-paper/40">© 2026 · EDUCATIONAL USE</span>
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+          <div className="flex items-center justify-between">
+            <p className="font-mono text-xs tracking-widest text-paper/60">
+              MEDLENS·AI — DEEP LEARNING IN HEALTH CARE
+            </p>
+            <p className="font-mono text-xs tracking-widest text-paper/40">© 2026 · EDUCATIONAL USE</p>
           </div>
         </div>
       </footer>
-      </FaultBoundary>
     </div>
   );
 }

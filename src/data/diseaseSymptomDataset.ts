@@ -1,17 +1,16 @@
 /* ------------------------------------------------------------------ */
-/*  Real training data                                                 */
+/*  Reference associations for the console symptom mapping             */
 /*                                                                     */
-/*  Disease → symptom associations are taken from the public Kaggle    */
-/*  "Disease Symptom Prediction" dataset (itachi9604). Training rows   */
-/*  are synthesized from those real associations (documented           */
-/*  augmentation) so the full pipeline runs client-side.               */
+/*  The full row-level dataset used by Training Grounds is bundled in   */
+/*  public/Training.csv and loaded by src/lib/diseaseDataset.ts. This   */
+/*  smaller profile table is retained for console symptom vocabulary.  */
 /* ------------------------------------------------------------------ */
 
 export const DATASET_SOURCE = {
   name: "Disease Symptom Prediction",
   author: "itachi9604",
   url: "https://www.kaggle.com/datasets/itachi9604/disease-symptom-description-dataset",
-  note: "36 diseases · 132 symptoms · public healthcare dataset",
+  note: "4,920 training rows · 41 diseases · 131 unique symptoms",
 };
 
 export interface DiseaseProfile {
@@ -19,7 +18,7 @@ export interface DiseaseProfile {
   symptoms: string[];
 }
 
-/** Real disease → symptom association matrix (public dataset, 30 classes subset). */
+/** Compact association reference used to map console symptoms; not the live training set. */
 export const DISEASE_SYMPTOM_MATRIX: DiseaseProfile[] = [
   { disease: "Fungal infection", symptoms: ["itching", "skin rash", "nodal skin eruptions", "dischromic patches"] },
   { disease: "Allergy", symptoms: ["continuous sneezing", "shivering", "chills", "watering from eyes"] },
@@ -106,8 +105,8 @@ export const REAL_DATASETS = [
   },
   {
     name: "Disease-Symptom Prediction",
-    size: "3,900 patient rows",
-    classes: "36 diseases · 132 symptoms",
+    size: "4,920 training rows",
+    classes: "41 diseases · 131 unique symptoms",
     url: DATASET_SOURCE.url,
     head: "SYMPTOM ENCODER",
   },

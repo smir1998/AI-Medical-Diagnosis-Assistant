@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { trainModel, type TrainedModel } from "../lib/train";
+import { loadDiseaseDataset } from "../lib/diseaseDataset";
 
 export function TrainingGrounds({ onTrained }: { onTrained: (m: TrainedModel) => void }) {
   const [training, setTraining] = useState(false);
@@ -7,6 +8,7 @@ export function TrainingGrounds({ onTrained }: { onTrained: (m: TrainedModel) =>
   const [lossHist, setLossHist] = useState<number[]>([]);
   const [accHist, setAccHist] = useState<number[]>([]);
   const [model, setModel] = useState<TrainedModel | null>(null);
+  const [error, setError] = useState("");
 
   const train = async () => {
     if (training) return;
@@ -14,19 +16,28 @@ export function TrainingGrounds({ onTrained }: { onTrained: (m: TrainedModel) =>
     setLossHist([]);
     setAccHist([]);
     setEpoch(-1);
+    setModel(null);
+    setError("");
 
-    const m = await trainModel({
-      epochs: 36,
-      onEpoch: (ep, loss, valAcc) => {
-        setEpoch(ep);
-        setLossHist((h) => [...h, loss]);
-        setAccHist((h) => [...h, valAcc]);
-      },
-    });
+    try {
+      const dataset = await loadDiseaseDataset();
+      const m = await trainModel({
+        epochs: 36,
+        dataset,
+        onEpoch: (ep, loss, valAcc) => {
+          setEpoch(ep);
+          setLossHist((h) => [...h, loss]);
+          setAccHist((h) => [...h, valAcc]);
+        },
+      });
 
-    setModel(m);
-    onTrained(m);
-    setTraining(false);
+      setModel(m);
+      onTrained(m);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Training could not start.");
+    } finally {
+      setTraining(false);
+    }
   };
 
   return (
@@ -38,9 +49,9 @@ export function TrainingGrounds({ onTrained }: { onTrained: (m: TrainedModel) =>
             Live SGD training in your browser<span className="text-mint">.</span>
           </h2>
           <p className="mt-3 max-w-3xl text-sm leading-relaxed text-paper/60">
-            Trains a multinomial logistic head on real disease–symptom associations (Kaggle), draws the loss
-            curve epoch-by-epoch, and reports <span className="font-semibold text-paper">measured</span>{" "}
-            accuracy/precision/recall/F1 on a held-out split.
+            Trains a multinomial logistic model on the bundled Kaggle training rows. Identical symptom
+            profiles stay together in a deterministic, per-disease holdout so duplicate rows cannot leak
+            across the split. No synthetic rows are created.
           </p>
         </div>
 
@@ -50,7 +61,7 @@ export function TrainingGrounds({ onTrained }: { onTrained: (m: TrainedModel) =>
               <p className="font-mono text-[10px] font-bold tracking-[0.22em] text-mint/70">
                 TRAINER · SGD + SOFTMAX CE
                 <span className="block text-[9px] font-normal tracking-widest text-paper/40">
-                  Disease-Symptom Prediction · 30 diseases · ~70 symptoms
+                  Disease Symptom Prediction · 41 labels · 131 unique symptom features
                 </span>
               </p>
               <button
@@ -84,10 +95,10 @@ export function TrainingGrounds({ onTrained }: { onTrained: (m: TrainedModel) =>
               <div className="mb-2 flex items-center justify-between font-mono text-[9px] tracking-[0.18em] text-paper/45">
                 <span>
                   <span className="mr-1 inline-block h-1.5 w-3 bg-alert" /> LOSS
-                  <span className="mx-2 mr-1 inline-block h-1.5 w-3 bg-mint" /> TEST ACC
+                  <span className="mx-2 mr-1 inline-block h-1.5 w-3 bg-mint" /> GROUPED HOLDOUT ACC
                 </span>
                 <span className="tabular-nums text-mint">
-                  {model ? `acc ${(model.metrics.accuracy * 100).toFixed(1)}%` : "awaiting run"}
+                {model ? `${model.sourceRows.toLocaleString()} source rows · ${model.metrics.testProfiles} heldout profiles` : "dataset loads on run"}
                 </span>
               </div>
               <svg viewBox="0 0 320 110" className="h-28 w-full" preserveAspectRatio="none">
@@ -134,12 +145,18 @@ export function TrainingGrounds({ onTrained }: { onTrained: (m: TrainedModel) =>
                     </div>
                   ))}
             </div>
+            {error && <p role="alert" className="mt-3 border border-alert/50 bg-alert/10 px-3 py-2 font-mono text-xs text-paper">{error}</p>}
+            {model && (
+              <p className="mt-3 font-mono text-[9px] leading-relaxed text-paper/45">
+                {model.trainingRows.toLocaleString()} training rows · {model.metrics.testRows.toLocaleString()} grouped holdout rows · {model.uniqueProfiles.toLocaleString()} unique symptom profiles · dataset scores are educational only.
+              </p>
+            )}
           </div>
 
           <div className="flex h-full flex-col gap-4">
             <div className="min-h-0 flex-1 border border-mint/25 bg-pine p-5">
               <p className="mb-3 font-mono text-[10px] font-bold tracking-[0.22em] text-mint/70">
-                MEASURED PER-CLASS · TOP 6 BY F1
+                GROUPED HOLDOUT · TOP 6 BY F1
               </p>
               {model ? (
                 <table className="w-full font-mono text-[11px]">

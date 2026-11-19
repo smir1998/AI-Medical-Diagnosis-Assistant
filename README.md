@@ -24,7 +24,7 @@ emergency number.
 | --- | --- | --- |
 | **Registrar** | On-device admission log (localStorage) | Intake form (name, age, sex, chief complaint, allergies, CTAS triage 1–5, HR/BP/SpO₂/temp vitals), auto-issued MRNs, clinical flag engine (hypoxia, tachycardia, febrile…), **per-MRN encounter trail** (every lab run tied to the chart on record), CSV export, chart/discharge workflow — the active patient stamps every report |
 | **Symptom Lab** | Multinomial Naive Bayes + one-hot vector UI | 24-dim symptom vector with live cell animation, scenario presets, softmax differential over 12 profiles, ICD-10 codes, severity tiers, red-flag rules |
-| **Training Grounds** | **Live SGD training in your browser** | Trains a multinomial logistic head on real disease–symptom associations (Kaggle), draws the loss curve epoch-by-epoch, and reports **measured** accuracy/precision/recall/F1 on a held-out split |
+| **Training Grounds** | **Live SGD training in your browser** | Loads the bundled 4,920-row Kaggle `Training.csv` (41 labels, 131 unique symptom features), trains a multinomial logistic model on those source rows, and reports grouped holdout metrics. Identical symptom profiles stay together; no synthetic rows are generated. |
 | **Semantic Engine** | `Xenova/all-MiniLM-L6-v2` via Transformers.js | Real ONNX transformer inference: free-text chief complaint → cosine-ranked symptom vector, lazy-loaded (~23 MB q8 weights, cached) |
 | **Radiology Lab** | Simulated CNN + real pixel-statistics head | Upload or load bundled synthetic teaching studies; decode → resize 224 → ÷255 → Conv/Pool trace → softmax; Grad-CAM-style hotspot; honest "synthetic" labeling |
 | **Derm Scan** | CLAHE → Otsu ROI → 3-class head + ABCDE engine | Benign / atypical / melanoma-pattern screening with ABCDE rule flags |
@@ -56,7 +56,7 @@ verified production models a clinical deployment would load — one per diagnost
 | Vision foundation | [`microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224`](https://huggingface.co/microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224) | ⏳ 196M · awaits q8 port |
 
 - **Already running in this browser:** [`Xenova/all-MiniLM-L6-v2`](https://huggingface.co/Xenova/all-MiniLM-L6-v2) — the Semantic Engine performs real ONNX inference with its q8 weights (~23 MB, lazy-loaded and cached).
-- **Already training in this browser:** the Training Grounds' logistic head reports accuracy measured on a held-out split of real disease–symptom associations — never invented numbers.
+- **Training Grounds:** each run loads the bundled row-level dataset, trains on its actual rows, and evaluates on symptom profiles held out by group. These educational dataset metrics do not indicate clinical performance.
 
 *Honesty policy: simulated heads say so in the UI. Figures quoted for them illustrate published
 benchmarks; only the Training Grounds and the Semantic Engine produce measured outputs.*

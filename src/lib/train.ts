@@ -1,4 +1,4 @@
-import { DISEASE_SYMPTOM_MATRIX } from "../data/diseaseSymptomDataset";
+import type { DiseaseDataset } from "./diseaseDataset";
 
 export interface ModelMetrics {
   accuracy: number;
@@ -6,6 +6,7 @@ export interface ModelMetrics {
   macroRecall: number;
   macroF1: number;
   testRows: number;
+  testProfiles: number;
   perClass: Array<{
     name: string;
     precision: number;
@@ -19,185 +20,232 @@ export interface TrainedModel {
   biases: number[];
   classes: string[];
   symptomVocab: string[];
+  sourceRows: number;
+  uniqueProfiles: number;
+  trainingRows: number;
   metrics: ModelMetrics;
   lossHistory: number[];
 }
 
 export interface TrainOptions {
   epochs: number;
-  rowsPerClass?: number;
+  dataset: DiseaseDataset;
   onEpoch?: (epoch: number, loss: number, valAcc: number) => void;
+}
+
+interface EncodedRow {
+  activeFeatures: number[];
+  label: number;
+}
+
+interface ProfileGroup {
+  signature: string;
+  label: number;
+  rows: EncodedRow[];
+}
+
+interface Prediction {
+  predicted: number;
+  actual: number;
+}
+
+function createRandom(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state += 0x6d2b79f5;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function shuffle<T>(items: T[], random: () => number): T[] {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
 }
 
 function softmax(logits: number[]): number[] {
   const maxLogit = Math.max(...logits);
-  const exps = logits.map((x) => Math.exp(x - maxLogit));
-  const sum = exps.reduce((a, b) => a + b, 0);
-  return exps.map((x) => x / sum);
+  const exps = logits.map((value) => Math.exp(value - maxLogit));
+  const sum = exps.reduce((total, value) => total + value, 0);
+  return exps.map((value) => value / sum);
 }
 
-function crossEntropyLoss(probs: number[], target: number): number {
-  return -Math.log(Math.max(probs[target], 1e-10));
+function logitsFor(activeFeatures: number[], weights: number[][], biases: number[]): number[] {
+  return weights.map((classWeights, classIndex) => {
+    let total = biases[classIndex];
+    for (const featureIndex of activeFeatures) total += classWeights[featureIndex];
+    return total;
+  });
 }
 
-export async function trainModel(options: TrainOptions): Promise<TrainedModel> {
-  const { epochs, onEpoch } = options;
-  const classes = DISEASE_SYMPTOM_MATRIX.map((d) => d.disease);
-  const numClasses = classes.length;
+function encodeDataset(dataset: DiseaseDataset, classes: string[]): EncodedRow[] {
+  const classIndex = new Map(classes.map((name, index) => [name, index]));
+  return dataset.rows.map((row) => {
+    const label = classIndex.get(row.disease);
+    if (label === undefined) throw new Error(`Unknown dataset label: ${row.disease}`);
+    return {
+      activeFeatures: row.symptoms.flatMap((value, index) => (value ? [index] : [])),
+      label,
+    };
+  });
+}
 
-  // Build symptom vocabulary from actual dataset
-  const symptomSet = new Set<string>();
-  DISEASE_SYMPTOM_MATRIX.forEach((d) => d.symptoms.forEach((s) => symptomSet.add(s)));
-  const symptomVocab = Array.from(symptomSet).sort();
-  const numFeatures = symptomVocab.length;
-  const symptomToIndex = new Map(symptomVocab.map((s, i) => [s, i]));
-
-  // Initialize weights and biases
-  const weights: number[][] = Array.from({ length: numClasses }, () =>
-    Array.from({ length: numFeatures }, () => (Math.random() - 0.5) * 0.1)
-  );
-  const biases: number[] = Array.from({ length: numClasses }, () => 0);
-
-  // Prepare training data - encode actual symptom names
-  const data = DISEASE_SYMPTOM_MATRIX.flatMap((d, labelIdx) =>
-    Array.from({ length: 50 }, () => {
-      const features = new Array(numFeatures).fill(0);
-      d.symptoms.forEach((symptom) => {
-        const idx = symptomToIndex.get(symptom);
-        if (idx !== undefined) features[idx] = 1;
-      });
-      return { features, label: labelIdx };
-    })
-  );
-
-  // Shuffle and split
-  const shuffled = [...data].sort(() => Math.random() - 0.5);
-  const trainData = shuffled.slice(0, Math.floor(shuffled.length * 0.8));
-  const valData = shuffled.slice(Math.floor(shuffled.length * 0.8));
-
-  const learningRate = 0.01;
-  const batchSize = 32;
-
-  for (let epoch = 0; epoch < epochs; epoch++) {
-    // Shuffle training data
-    const epochData = [...trainData].sort(() => Math.random() - 0.5);
-    let totalLoss = 0;
-
-    // Mini-batch SGD
-    for (let i = 0; i < epochData.length; i += batchSize) {
-      const batch = epochData.slice(i, i + batchSize);
-      const gradW = Array.from({ length: numClasses }, () =>
-        Array.from({ length: numFeatures }, () => 0)
-      );
-      const gradB = Array.from({ length: numClasses }, () => 0);
-
-      for (const sample of batch) {
-        const logits = weights.map((w, c) =>
-          w.reduce((sum, wj, j) => sum + wj * sample.features[j], 0) + biases[c]
-        );
-        const probs = softmax(logits);
-        const loss = crossEntropyLoss(probs, sample.label);
-        totalLoss += loss;
-
-        // Compute gradients
-        for (let c = 0; c < numClasses; c++) {
-          const error = probs[c] - (c === sample.label ? 1 : 0);
-          for (let j = 0; j < numFeatures; j++) {
-            gradW[c][j] += error * sample.features[j];
-          }
-          gradB[c] += error;
-        }
-      }
-
-      // Update weights
-      for (let c = 0; c < numClasses; c++) {
-        for (let j = 0; j < numFeatures; j++) {
-          weights[c][j] -= learningRate * (gradW[c][j] / batch.length);
-        }
-        biases[c] -= learningRate * (gradB[c] / batch.length);
-      }
+function splitByUniqueProfile(rows: EncodedRow[], numClasses: number) {
+  const groupsBySignature = new Map<string, ProfileGroup>();
+  for (const row of rows) {
+    const signature = row.activeFeatures.join(",");
+    const existing = groupsBySignature.get(signature);
+    if (existing && existing.label !== row.label) {
+      throw new Error("The dataset assigns different labels to the same symptom profile; a safe holdout split is not possible.");
     }
-
-    // Validation accuracy
-    let correct = 0;
-    for (const sample of valData) {
-      const logits = weights.map((w, c) =>
-        w.reduce((sum, wj, j) => sum + wj * sample.features[j], 0) + biases[c]
-      );
-      const predicted = logits.indexOf(Math.max(...logits));
-      if (predicted === sample.label) correct++;
-    }
-    const valAcc = correct / valData.length;
-    const avgLoss = totalLoss / trainData.length;
-
-    if (onEpoch) {
-      onEpoch(epoch, avgLoss, valAcc);
-    }
-
-    // Yield to UI
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    if (existing) existing.rows.push(row);
+    else groupsBySignature.set(signature, { signature, label: row.label, rows: [row] });
   }
 
-  // Calculate final metrics
-  const predictions: Array<{ predicted: number; actual: number }> = [];
-  for (const sample of valData) {
-    const logits = weights.map((w, c) =>
-      w.reduce((sum, wj, j) => sum + wj * sample.features[j], 0) + biases[c]
-    );
-    const predicted = logits.indexOf(Math.max(...logits));
-    predictions.push({ predicted, actual: sample.label });
+  const groupsByClass = Array.from({ length: numClasses }, () => [] as ProfileGroup[]);
+  for (const group of groupsBySignature.values()) groupsByClass[group.label].push(group);
+
+  const random = createRandom(42);
+  const trainingRows: EncodedRow[] = [];
+  const holdoutRows: EncodedRow[] = [];
+  let holdoutProfiles = 0;
+
+  for (const classGroups of groupsByClass) {
+    const shuffledGroups = shuffle(classGroups, random);
+    // Hold out about 20% of unique profiles per class, keeping duplicates together.
+    const holdoutCount = shuffledGroups.length > 1
+      ? Math.max(1, Math.min(shuffledGroups.length - 1, Math.round(shuffledGroups.length * 0.2)))
+      : 0;
+    const heldOut = new Set(shuffledGroups.slice(0, holdoutCount).map((group) => group.signature));
+    holdoutProfiles += heldOut.size;
+
+    for (const group of classGroups) {
+      (heldOut.has(group.signature) ? holdoutRows : trainingRows).push(...group.rows);
+    }
   }
 
-  const accuracy = predictions.filter((p) => p.predicted === p.actual).length / predictions.length;
+  return {
+    trainingRows,
+    holdoutRows,
+    uniqueProfiles: groupsBySignature.size,
+    holdoutProfiles,
+  };
+}
 
-  const perClass = classes.map((name, c) => {
-    const tp = predictions.filter((p) => p.predicted === c && p.actual === c).length;
-    const fp = predictions.filter((p) => p.predicted === c && p.actual !== c).length;
-    const fn = predictions.filter((p) => p.predicted !== c && p.actual === c).length;
+function evaluate(rows: EncodedRow[], weights: number[][], biases: number[], classes: string[], profileCount: number): ModelMetrics {
+  const predictions: Prediction[] = rows.map((row) => {
+    const logits = logitsFor(row.activeFeatures, weights, biases);
+    return { predicted: logits.indexOf(Math.max(...logits)), actual: row.label };
+  });
 
+  const perClass = classes.map((name, classIndex) => {
+    const tp = predictions.filter((p) => p.predicted === classIndex && p.actual === classIndex).length;
+    const fp = predictions.filter((p) => p.predicted === classIndex && p.actual !== classIndex).length;
+    const fn = predictions.filter((p) => p.predicted !== classIndex && p.actual === classIndex).length;
     const precision = tp + fp > 0 ? tp / (tp + fp) : 0;
     const recall = tp + fn > 0 ? tp / (tp + fn) : 0;
     const f1 = precision + recall > 0 ? (2 * precision * recall) / (precision + recall) : 0;
-
     return { name, precision, recall, f1 };
   });
 
-  const macroPrecision = perClass.reduce((sum, c) => sum + c.precision, 0) / numClasses;
-  const macroRecall = perClass.reduce((sum, c) => sum + c.recall, 0) / numClasses;
-  const macroF1 = perClass.reduce((sum, c) => sum + c.f1, 0) / numClasses;
+  const mean = (values: number[]) => values.reduce((total, value) => total + value, 0) / Math.max(values.length, 1);
+  return {
+    accuracy: predictions.filter((p) => p.predicted === p.actual).length / Math.max(predictions.length, 1),
+    macroPrecision: mean(perClass.map((item) => item.precision)),
+    macroRecall: mean(perClass.map((item) => item.recall)),
+    macroF1: mean(perClass.map((item) => item.f1)),
+    testRows: rows.length,
+    testProfiles: profileCount,
+    perClass,
+  };
+}
+
+export async function trainModel(options: TrainOptions): Promise<TrainedModel> {
+  const { epochs, dataset, onEpoch } = options;
+  if (!Number.isInteger(epochs) || epochs < 1) throw new Error("Training needs at least one epoch.");
+  if (dataset.rows.length === 0 || dataset.symptomVocab.length === 0) throw new Error("The disease dataset has no usable rows.");
+
+  const classes = [...new Set(dataset.rows.map((row) => row.disease))].sort();
+  const numClasses = classes.length;
+  const numFeatures = dataset.symptomVocab.length;
+  const rows = encodeDataset(dataset, classes);
+  const split = splitByUniqueProfile(rows, numClasses);
+  if (split.trainingRows.length === 0 || split.holdoutRows.length === 0) {
+    throw new Error("The dataset needs multiple unique symptom profiles per class to create a grouped holdout.");
+  }
+
+  const random = createRandom(2026);
+  const weights = Array.from({ length: numClasses }, () =>
+    Array.from({ length: numFeatures }, () => (random() - 0.5) * 0.02)
+  );
+  const biases = new Array(numClasses).fill(0);
+  const lossHistory: number[] = [];
+  const learningRate = 0.02;
+  const batchSize = 64;
+
+  for (let epoch = 0; epoch < epochs; epoch++) {
+    const epochRows = shuffle(split.trainingRows, random);
+    let totalLoss = 0;
+
+    for (let offset = 0; offset < epochRows.length; offset += batchSize) {
+      const batch = epochRows.slice(offset, offset + batchSize);
+      const gradientWeights = Array.from({ length: numClasses }, () => new Array(numFeatures).fill(0));
+      const gradientBiases = new Array(numClasses).fill(0);
+
+      for (const row of batch) {
+        const probabilities = softmax(logitsFor(row.activeFeatures, weights, biases));
+        totalLoss -= Math.log(Math.max(probabilities[row.label], 1e-12));
+        for (let classIndex = 0; classIndex < numClasses; classIndex++) {
+          const error = probabilities[classIndex] - (classIndex === row.label ? 1 : 0);
+          gradientBiases[classIndex] += error;
+          for (const featureIndex of row.activeFeatures) gradientWeights[classIndex][featureIndex] += error;
+        }
+      }
+
+      for (let classIndex = 0; classIndex < numClasses; classIndex++) {
+        for (let featureIndex = 0; featureIndex < numFeatures; featureIndex++) {
+          weights[classIndex][featureIndex] -= learningRate * gradientWeights[classIndex][featureIndex] / batch.length;
+        }
+        biases[classIndex] -= learningRate * gradientBiases[classIndex] / batch.length;
+      }
+    }
+
+    const avgLoss = totalLoss / split.trainingRows.length;
+    const holdout = evaluate(split.holdoutRows, weights, biases, classes, split.holdoutProfiles);
+    lossHistory.push(avgLoss);
+    onEpoch?.(epoch, avgLoss, holdout.accuracy);
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  }
 
   return {
     weights,
     biases,
     classes,
-    symptomVocab,
-    lossHistory: [], // Simplified for now
-    metrics: {
-      accuracy,
-      macroPrecision,
-      macroRecall,
-      macroF1,
-      testRows: valData.length,
-      perClass,
-    },
+    symptomVocab: dataset.symptomVocab,
+    sourceRows: dataset.rows.length,
+    uniqueProfiles: split.uniqueProfiles,
+    trainingRows: split.trainingRows.length,
+    lossHistory,
+    metrics: evaluate(split.holdoutRows, weights, biases, classes, split.holdoutProfiles),
   };
 }
 
 export function predictWithModel(model: TrainedModel, symptoms: string[]): Array<{ name: string; prob: number }> {
-  const symptomToIndex = new Map(model.symptomVocab.map((s, i) => [s, i]));
-  const features = new Array(model.symptomVocab.length).fill(0);
-  symptoms.forEach((symptom) => {
-    const idx = symptomToIndex.get(symptom);
-    if (idx !== undefined) features[idx] = 1;
-  });
+  const symptomToIndex = new Map(model.symptomVocab.map((symptom, index) => [symptom, index]));
+  const activeFeatures = [...new Set(symptoms.flatMap((symptom) => {
+    const index = symptomToIndex.get(symptom);
+    return index === undefined ? [] : [index];
+  }))];
+  if (activeFeatures.length === 0) return [];
 
-  const logits = model.weights.map((w, c) =>
-    w.reduce((sum, wj, j) => sum + wj * features[j], 0) + model.biases[c]
-  );
-
-  const probs = softmax(logits);
-  
+  const probabilities = softmax(logitsFor(activeFeatures, model.weights, model.biases));
   return model.classes
-    .map((name, i) => ({ name, prob: probs[i] }))
+    .map((name, index) => ({ name, prob: probabilities[index] }))
     .sort((a, b) => b.prob - a.prob);
 }

@@ -29,13 +29,13 @@ export function StatusBar() {
             <div className="hidden items-center gap-2 md:flex">
               <span className="inline-flex items-center gap-1.5 border border-paper/15 bg-paper/5 px-2 py-1 font-mono text-[10px] tracking-widest text-paper/80">
                 <span className="h-1.5 w-1.5 rounded-full bg-mint dot-live" />
-                <span className="text-paper/50">CNN</span>
-                <span className="font-semibold text-paper">ONLINE</span>
+                <span className="text-paper/50">IMAGING</span>
+                <span className="font-semibold text-paper">SIMULATED</span>
               </span>
               <span className="inline-flex items-center gap-1.5 border border-paper/15 bg-paper/5 px-2 py-1 font-mono text-[10px] tracking-widest text-paper/80">
                 <span className="h-1.5 w-1.5 rounded-full bg-mint dot-live" />
-                <span className="text-paper/50">NLP</span>
-                <span className="font-semibold text-paper">READY</span>
+                <span className="text-paper/50">SYMPTOMS</span>
+                <span className="font-semibold text-paper">EDUCATIONAL</span>
               </span>
             </div>
             <span className="border border-mint/30 bg-mint/10 px-2.5 py-1 font-mono text-sm font-semibold tabular-nums tracking-widest text-mint">

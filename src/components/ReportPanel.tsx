@@ -93,9 +93,9 @@ export function ReportPanel({ symptom, image, patient }: Props) {
                   <span className="text-inksoft">STUDY&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</span> {image.fileName}
                 </p>
                 <p>
-                  <span className="text-inksoft">FINDING&nbsp;&nbsp;&nbsp;:</span>{" "}
+                  <span className="text-inksoft">SIMULATED FINDING :</span>{" "}
                   <span className={`font-bold ${Number(image.pneumonia) > 50 ? "text-alert" : "text-teal"}`}>
-                    {Number(image.pneumonia) > 50 ? "Pneumonia pattern" : "No acute abnormality"}
+                    {Number(image.pneumonia) > 50 ? "Pneumonia-pattern demo signal" : "No demo signal"}
                   </span>
                 </p>
                 <p>
@@ -122,7 +122,7 @@ export function ReportPanel({ symptom, image, patient }: Props) {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mr-1 inline h-3 w-3 text-amber">
                   <path d="M12 3L1.5 20h21L12 3zM12 9.5v5M12 17.5v.5" />
                 </svg>
-                Educational decision-support simulation — NOT a clinical diagnosis. A licensed clinician must confirm every finding before any care decision.
+                Educational simulation only — not a diagnosis, image interpretation, or clinical performance estimate. Do not use these results to make care decisions.
               </p>
             </div>
           </div>

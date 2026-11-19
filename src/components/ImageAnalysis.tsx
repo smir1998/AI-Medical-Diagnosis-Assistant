@@ -1,32 +1,50 @@
 import { useState } from "react";
+import { predictImage, type ImageResult } from "../lib/engine";
 
 interface Props {
-  onComplete: (result: any) => void;
+  onComplete: (result: ImageResult) => void;
 }
 
 export function ImageAnalysis({ onComplete }: Props) {
   const [image, setImage] = useState<string | null>(null);
   const [fileName, setFileName] = useState("");
+  const [source, setSource] = useState<ImageResult["source"]>("upload");
+  const [error, setError] = useState("");
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setError("");
+    if (!file.type.startsWith("image/")) {
+      setImage(null);
+      setFileName("");
+      setError("Choose an image file to preview the demo.");
+      e.target.value = "";
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setImage(null);
+      setFileName("");
+      setError("Image must be 10 MB or smaller.");
+      e.target.value = "";
+      return;
+    }
     setFileName(file.name);
     const reader = new FileReader();
-    reader.onload = (ev) => setImage(ev.target?.result as string);
+    reader.onload = (ev) => {
+      if (typeof ev.target?.result === "string") setImage(ev.target.result);
+      else setError("This image could not be read. Try another file.");
+    };
+    reader.onerror = () => setError("This image could not be read. Try another file.");
     reader.readAsDataURL(file);
+    setSource("upload");
+    e.target.value = "";
   };
 
   const analyze = () => {
     if (!image) return;
-    // Simulated CNN analysis
-    const pneumonia = Math.random() > 0.5 ? 70 + Math.random() * 25 : 5 + Math.random() * 20;
-    onComplete({
-      fileName,
-      pneumonia: pneumonia.toFixed(1),
-      normal: (100 - pneumonia).toFixed(1),
-      heat: { x: 50 + Math.random() * 20, y: 50 + Math.random() * 20 },
-    });
+    // The engine returns a deterministic teaching simulation, not image inference.
+    onComplete(predictImage(source, fileName, image));
   };
 
   return (
@@ -36,6 +54,8 @@ export function ImageAnalysis({ onComplete }: Props) {
           onClick={() => {
             setImage("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%23131313'/%3E%3Ccircle cx='256' cy='256' r='180' fill='%23070707'/%3E%3Cellipse cx='320' cy='320' rx='60' ry='50' fill='%23f0f0f0' opacity='0.9'/%3E%3C/svg%3E");
             setFileName("PA_chest_0412.dcm.png");
+            setSource("pneumonia-sample");
+            setError("");
           }}
           className="inline-flex items-center gap-2 border border-ink/25 bg-paper px-3 py-2 font-mono text-xs font-semibold text-ink transition-all duration-200 hover:border-ink hover:-translate-y-px"
         >
@@ -53,6 +73,12 @@ export function ImageAnalysis({ onComplete }: Props) {
           <input type="file" accept="image/*" onChange={handleFile} className="hidden" />
         </label>
       </div>
+
+      <p className="border-l-2 border-amber bg-amber/10 px-3 py-2 text-xs leading-relaxed text-ink">
+        Demo only: this screen does not inspect image pixels or run a trained model. The displayed score is
+        simulated and must not guide care.
+      </p>
+      {error && <p role="alert" className="text-sm font-semibold text-alert">{error}</p>}
 
       <div className="grid gap-5 lg:grid-cols-[1.15fr_1fr]">
         <div className="dark-grid relative flex min-h-[280px] items-center justify-center overflow-hidden border-2 border-pine">
@@ -85,7 +111,7 @@ export function ImageAnalysis({ onComplete }: Props) {
               <path d="M3 7V4a1 1 0 0 1 1-1h3M17 3h3a1 1 0 0 1 1 1v3M21 17v3a1 1 0 0 1-1 1h-3M7 21H4a1 1 0 0 1-1-1v-3" />
               <path d="M3 12h18" />
             </svg>
-            Run CNN inference
+            Run demo simulation
           </button>
         </div>
       </div>

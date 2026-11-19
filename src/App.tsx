@@ -48,9 +48,9 @@ export default function App() {
             <span className="text-alert">_</span>
           </h2>
           <p className="mt-4 max-w-2xl text-lg leading-relaxed text-inksoft">
-            An AI triage workstation with four diagnostic heads — symptom encoder, chest X-ray CNN,
-            dermoscopy classifier, and medical NLP desk — powered by verified Hugging Face models with
-            real published metrics.
+            An educational decision-support demo. Symptom scores use a small reference table, and
+            radiology results are simulated; external model cards are listed for learning and are not
+            loaded by this app.
           </p>
         </div>
       </section>

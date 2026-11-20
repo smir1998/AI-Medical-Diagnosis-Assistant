@@ -4,7 +4,7 @@ MedLens AI is an educational demonstration of medical software concepts. It is n
 
 ## What the app does
 
-- **Patient list:** keeps the current session's sample patient entries in app memory. Data persistence and clinical record management are not implemented.
+- **Patient list:** keeps sample patient entries in page memory, shows a demo-data notice, and provides a clear-all control. Data persistence and clinical record management are not implemented; do not enter real patient information.
 - **Symptom Lab:** produces hand-weighted relative scores from a small set of built-in disease profiles. These are not calibrated probabilities or diagnoses.
 - **Image panel:** demonstrates an upload and results interface. Findings are simulated; uploaded images are not processed by a trained image model.
 - **Chatbot:** matches keywords to a small static set of educational answers. It is not a medical language model and cannot assess symptoms or urgency.

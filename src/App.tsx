@@ -68,6 +68,12 @@ export default function App() {
     if (activePatientId === id) setActivePatientId(null);
   };
 
+  const handleClearAllPatients = () => {
+    setPatients([]);
+    setActivePatientId(null);
+    setReport(null);
+  };
+
   return (
     <div className="min-h-screen">
       <div className="noise-overlay" aria-hidden="true" />
@@ -128,6 +134,7 @@ export default function App() {
               onActivate={setActivePatientId}
               onDischarge={handleDischarge}
               onRemove={handleRemove}
+              onClearAll={handleClearAllPatients}
             />
           )}
           {tab === "symptom" && (

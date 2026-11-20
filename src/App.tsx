@@ -1,12 +1,20 @@
 import { useState } from "react";
 import { StatusBar } from "./components/StatusBar";
 import { PatientRegistry, type Patient } from "./components/PatientRegistry";
-import { SymptomChecker } from "./components/SymptomChecker";
+import { SymptomChecker, type SymptomAnalysisResult } from "./components/SymptomChecker";
 import { ImageAnalysis } from "./components/ImageAnalysis";
 import { Chatbot } from "./components/Chatbot";
 import { ReportPanel } from "./components/ReportPanel";
 import { ModelRegistry } from "./components/ModelRegistry";
 import { TrainingGrounds } from "./components/TrainingGrounds";
+import type { ImageResult } from "./lib/engine";
+
+interface AnalysisReport {
+  patientId: string | null;
+  patient: Patient | null;
+  symptom?: SymptomAnalysisResult;
+  image?: ImageResult;
+}
 
 type Tab = "patient" | "symptom" | "image" | "chat";
 
@@ -14,10 +22,37 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("patient");
   const [patients, setPatients] = useState<Patient[]>([]);
   const [activePatientId, setActivePatientId] = useState<string | null>(null);
-  const [symptomResult, setSymptomResult] = useState<any>(null);
-  const [imageResult, setImageResult] = useState<any>(null);
+  const [report, setReport] = useState<AnalysisReport | null>(null);
 
   const activePatient = patients.find((p) => p.id === activePatientId) || null;
+
+  const recordSymptomResult = (symptom: SymptomAnalysisResult) => {
+    const patientSnapshot = activePatient
+      ? { ...activePatient, vitals: { ...activePatient.vitals }, flags: [...activePatient.flags] }
+      : null;
+    setReport((previous) => {
+      const samePatient = previous?.patientId === activePatientId;
+      const current = samePatient
+        ? previous
+        : { patientId: activePatientId, patient: patientSnapshot };
+      return { ...current, symptom };
+    });
+    setTab("patient");
+  };
+
+  const recordImageResult = (image: ImageResult) => {
+    const patientSnapshot = activePatient
+      ? { ...activePatient, vitals: { ...activePatient.vitals }, flags: [...activePatient.flags] }
+      : null;
+    setReport((previous) => {
+      const samePatient = previous?.patientId === activePatientId;
+      const current = samePatient
+        ? previous
+        : { patientId: activePatientId, patient: patientSnapshot };
+      return { ...current, image };
+    });
+    setTab("patient");
+  };
 
   const handleAdmit = (p: Patient) => {
     setPatients([p, ...patients]);
@@ -96,29 +131,25 @@ export default function App() {
             />
           )}
           {tab === "symptom" && (
-            <SymptomChecker
-              onComplete={(result) => {
-                setSymptomResult(result);
-                setTab("patient");
-              }}
-            />
+            <SymptomChecker onComplete={recordSymptomResult} />
           )}
           {tab === "image" && (
-            <ImageAnalysis
-              onComplete={(result) => {
-                setImageResult(result);
-                setTab("patient");
-              }}
-            />
+            <ImageAnalysis onComplete={recordImageResult} />
           )}
           {tab === "chat" && <Chatbot />}
         </div>
 
         {/* Report */}
-        {(symptomResult || imageResult) && (
+        {report && report.patientId === activePatientId && (report.symptom || report.image) && (
           <div className="mt-8">
-            <ReportPanel symptom={symptomResult} image={imageResult} patient={activePatient} />
+            <ReportPanel symptom={report.symptom} image={report.image} patient={report.patient} />
           </div>
+        )}
+        {report && report.patientId !== activePatientId && (
+          <p role="status" className="mt-8 border-l-2 border-amber bg-amber/10 px-4 py-3 text-sm text-ink">
+            The previous analysis belongs to {report.patient?.name ?? "an unassigned session"}
+            {report.patientId ? ` (${report.patientId})` : ""}. It is hidden while another chart is active.
+          </p>
         )}
       </main>
 

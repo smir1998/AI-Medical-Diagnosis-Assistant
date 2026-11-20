@@ -2,7 +2,17 @@ import { useState } from "react";
 import { SYMPTOMS, DISEASES, RED_FLAG_SINGLE } from "../data/medical";
 
 interface Props {
-  onComplete: (result: any) => void;
+  onComplete: (result: SymptomAnalysisResult) => void;
+}
+
+export interface SymptomAnalysisResult {
+  results: Array<{
+    disease: (typeof DISEASES)[number];
+    confidence: number;
+  }>;
+  redFlags: string[];
+  duration: string;
+  severity: number;
 }
 
 export function SymptomChecker({ onComplete }: Props) {

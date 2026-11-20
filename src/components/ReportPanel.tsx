@@ -1,7 +1,11 @@
+import type { Patient } from "./PatientRegistry";
+import type { ImageResult } from "../lib/engine";
+import type { SymptomAnalysisResult } from "./SymptomChecker";
+
 interface Props {
-  symptom?: any;
-  image?: any;
-  patient?: any;
+  symptom?: SymptomAnalysisResult;
+  image?: ImageResult;
+  patient?: Patient | null;
 }
 
 export function ReportPanel({ symptom, image, patient }: Props) {
@@ -60,6 +64,11 @@ export function ReportPanel({ symptom, image, patient }: Props) {
               <span className="font-bold">Level {patient.triage}</span>
             </p>
           </div>
+        )}
+        {!patient && (
+          <p className="border-b border-amber/40 bg-amber/10 px-5 py-2.5 font-mono text-[10px] font-semibold text-ink">
+            UNASSIGNED ANALYSIS — no patient chart was active when this result was recorded.
+          </p>
         )}
 
         <div className="grid gap-0 md:grid-cols-[1.1fr_0.9fr]">

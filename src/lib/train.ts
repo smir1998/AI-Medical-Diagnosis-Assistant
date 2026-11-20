@@ -9,6 +9,7 @@ export interface ModelMetrics {
   testProfiles: number;
   perClass: Array<{
     name: string;
+    support: number;
     precision: number;
     recall: number;
     f1: number;
@@ -151,7 +152,7 @@ function evaluate(rows: EncodedRow[], weights: number[][], biases: number[], cla
     const precision = tp + fp > 0 ? tp / (tp + fp) : 0;
     const recall = tp + fn > 0 ? tp / (tp + fn) : 0;
     const f1 = precision + recall > 0 ? (2 * precision * recall) / (precision + recall) : 0;
-    return { name, precision, recall, f1 };
+    return { name, support: tp + fn, precision, recall, f1 };
   });
 
   const mean = (values: number[]) => values.reduce((total, value) => total + value, 0) / Math.max(values.length, 1);

@@ -195,13 +195,14 @@ export function TrainingGrounds({ onTrained }: { onTrained: (m: TrainedModel) =>
           <div className="flex h-full flex-col gap-4">
             <div className="min-h-0 flex-1 border border-mint/25 bg-pine p-5">
               <p className="mb-3 font-mono text-[10px] font-bold tracking-[0.22em] text-mint/70">
-                GROUPED HOLDOUT · TOP 6 BY F1
+                GROUPED HOLDOUT · TOP 6 BY F1 · N = HELDOUT ROWS
               </p>
               {model ? (
                 <table className="w-full font-mono text-[11px]">
                   <thead>
                     <tr className="text-left text-[9px] tracking-[0.18em] text-paper/40">
                       <th className="pb-1.5">DISEASE</th>
+                      <th className="pb-1.5 text-right">N</th>
                       <th className="pb-1.5 text-right">P</th>
                       <th className="pb-1.5 text-right">R</th>
                       <th className="pb-1.5 text-right">F1</th>
@@ -214,6 +215,7 @@ export function TrainingGrounds({ onTrained }: { onTrained: (m: TrainedModel) =>
                       .map((c) => (
                         <tr key={c.name} className="border-t border-mint/10 transition-colors hover:bg-mint/5">
                           <td className="py-1.5 pr-2 text-paper/85">{c.name}</td>
+                          <td className="py-1.5 text-right tabular-nums text-paper/65">{c.support}</td>
                           <td className="py-1.5 text-right tabular-nums text-mint/90">{(c.precision * 100).toFixed(0)}</td>
                           <td className="py-1.5 text-right tabular-nums text-mint/90">{(c.recall * 100).toFixed(0)}</td>
                           <td className="py-1.5 text-right font-bold tabular-nums text-mint">{(c.f1 * 100).toFixed(0)}</td>

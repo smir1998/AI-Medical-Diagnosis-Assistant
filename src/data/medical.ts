@@ -215,47 +215,47 @@ export const CHAT_KB: ChatEntry[] = [
   {
     keys: ["cnn", "convolutional", "convolution"],
     answer:
-      "A CNN (Convolutional Neural Network) is a deep-learning architecture built for images. Convolutional filters slide across the X-ray detecting edges → textures → clinical patterns (like consolidation), then pooling compresses them and dense layers output class probabilities.",
+      "A convolutional neural network (CNN) is an image-model architecture that learns spatial patterns through convolution filters and pooling. This demo does not run a CNN: its image panel returns a deterministic teaching result and does not assess medical images.",
   },
   {
     keys: ["normalize", "normalization", "255", "pixel"],
     answer:
-      "We divide pixel values by 255 to scale them into [0, 1]. Normalization puts every input on the same range, which makes gradient descent converge faster and training far more stable.",
+      "Image normalization often rescales pixel values, for example from [0, 255] to [0, 1], before model inference. This demo does not preprocess pixels or run image-model inference.",
   },
   {
     keys: ["transfer", "resnet", "mobilenet", "pretrained", "pre-trained"],
     answer:
-      "Transfer learning reuses a model pre-trained on ImageNet (e.g. ResNet-50, MobileNetV2) and fine-tunes its top layers on medical images. It reaches high accuracy with far fewer X-rays and far less GPU time.",
+      "Transfer learning starts from a model trained on one dataset and adapts it to another task. Whether it improves performance depends on the source and target data, training method, and evaluation design. This app does not perform transfer learning.",
   },
   {
     keys: ["precision", "recall", "accuracy", "metric", "f1"],
     answer:
-      "Accuracy = overall correctness. Precision = of predicted positives, how many were real. Recall = of real positives, how many we caught. In healthcare, recall matters most — missing pneumonia (a false negative) is more dangerous than an extra review (a false positive).",
+      "Accuracy is the share of all predictions that are correct; precision is the share of positive predictions that are correct; recall is the share of actual positives detected. Which metric matters most depends on the intended use, harms, and operating threshold. The metrics in Training Grounds describe only its held-out dataset split.",
   },
   {
     keys: ["accurate", "reliable", "trust", "validated", "how good", "limits"],
     answer:
-      "Honest answer: this console is a teaching simulation. Its numbers are deterministic and reproducible, but not clinically validated — the CNN figures shown (e.g. 91.83% accuracy) illustrate what published chest X-ray models achieve. Never treat its output as a diagnosis; it exists to teach the pipeline.",
+      "This is an educational demonstration, not a medical device or a clinically validated system. Symptom scores use hand-weighted example profiles; image results are simulated; and Training Grounds evaluates a separate model on a held-out portion of a bundled teaching dataset. None of these results is a diagnosis or evidence of clinical performance.",
   },
   {
     keys: ["doctor", "see a doctor", "urgent", "emergency", "hospital", "when to"],
     answer:
-      "Seek urgent care for: chest pain, difficulty breathing, confusion, stiff neck with fever, oxygen saturation below 94%, dehydration, or any symptom that is severe or rapidly worsening. This tool is educational — it never replaces a clinician.",
+      "This educational app cannot assess urgency. If you think you may be having an emergency or symptoms are severe or rapidly worsening, contact your local emergency service or a qualified clinician now.",
   },
   {
     keys: ["fever"],
     answer:
-      "Fever is a defence response, usually infectious. Rest, fluids, and paracetamol help. Consult a clinician if it exceeds 39.4 °C, lasts over 3 days, or comes with rash, stiff neck, breathing difficulty or chest pain.",
+      "Fever can have many causes, and what to do depends on age, health, and other symptoms. This app cannot provide personal treatment advice. Contact a qualified clinician if you are concerned, and use local emergency services for severe or rapidly worsening symptoms.",
   },
   {
     keys: ["x-ray", "xray", "upload", "image", "prepare"],
     answer:
-      "For the image lab: upload a chest radiograph (JPG/PNG). The pipeline resizes it to 224×224, normalizes intensities, runs it through the CNN and returns Normal vs Pneumonia probabilities with a Grad-CAM style attention hotspot.",
+      "The image panel is a UI demonstration only. Uploaded images are not analyzed by a trained model; its displayed label and visual overlay are simulated and must not be used to assess a radiograph.",
   },
   {
     keys: ["how does", "how it works", "work", "architecture", "pipeline"],
     answer:
-      "Four heads: (1) a symptom encoder converts checked symptoms into a weighted feature vector and scores 12 disease profiles with a softmax head; (2) a CNN scores uploaded chest radiographs; (3) a dermoscopy CNN classifies skin lesions against the ABCDE rule. All are deterministic educational simulations of real clinical ML pipelines.",
+      "The active app has a patient list, a hand-weighted symptom scoring demo, a simulated image panel, a keyword-based educational chatbot, a report view, a model reference list, and a separate SGD training sandbox. The sandbox trains on bundled dataset rows but does not power the symptom scores. The app does not run a radiology or dermoscopy model.",
   },
   {
     keys: ["deploy", "streamlit", "fastapi", "render", "railway"],
@@ -265,23 +265,23 @@ export const CHAT_KB: ChatEntry[] = [
   {
     keys: ["hugging", "hf", "which model", "model zoo", "biomed", "pubmedbert", "meditron", "registry"],
     answer:
-      "The Model Registry section lists the verified Hugging Face production lineage: mdsajjadullah/chest-xray-pneumonia-resnet50 (91.83% accuracy, Radiology), syaha/skin_cancer_detection_model on HAM10000 (73% accuracy, Derm), microsoft/BiomedNLP-PubMedBERT (82.91 BLURB, symptom encoding), epfl-llm/meditron-7b (57.5% avg, medical Q&A), and microsoft/BiomedCLIP as the multimodal foundation. The console itself runs deterministic teaching heads so every step stays explainable.",
+      "Model Registry contains links to external model projects for reference. Those projects and their published metrics are not integrated into this app and do not validate its outputs. The only trained model in the app is the standalone dataset-training sandbox.",
   },
 ];
 
 export const CHAT_FALLBACK =
-  "I couldn't match that to my knowledge base. Try asking about CNNs, normalization, transfer learning, precision/recall, or when to see a doctor. For personal symptoms, please use the Symptom Lab tab — and remember I'm an educational tool, not a clinician.";
+  "I couldn't match that question. I can explain this demo's features and general machine-learning terms, but I can't assess symptoms or give personal medical advice. For health concerns, contact a qualified clinician; for emergencies, contact local emergency services.";
 
 /* ------------------------------------------------------------------ */
 /*  Pipeline + models + FAQ                                            */
 /* ------------------------------------------------------------------ */
 
 export const PIPELINE_STAGES = [
-  { id: "input", label: "Patient Input", detail: "symptoms / DICOM" },
-  { id: "pre", label: "Preprocessing", detail: "resize 224 · ÷255" },
-  { id: "cnn", label: "CNN Inference", detail: "Conv → Pool → Dense" },
-  { id: "soft", label: "Softmax", detail: "class probabilities" },
-  { id: "report", label: "Report", detail: "recommendations" },
+  { id: "input", label: "Example Input", detail: "selected symptoms" },
+  { id: "pre", label: "Profile Matching", detail: "hand-weighted features" },
+  { id: "cnn", label: "Relative Scoring", detail: "built-in teaching profiles" },
+  { id: "soft", label: "Score Display", detail: "not probabilities" },
+  { id: "report", label: "Educational Summary", detail: "not medical advice" },
 ];
 
 export const HF_MODEL_ZOO = [
@@ -432,16 +432,13 @@ export const SAMPLE_XRAY_NORMAL =
   "https://image.qwenlm.ai/generated-images/12db6a24-0b22-469e-bbf6-94d7bb1eec08/_result.png";
 
 export const TICKER_ITEMS = [
-  "12,480 scans analyzed",
-  "Model zoo · 5 verified HF Hub models",
-  "PneumoNet v3 accuracy 91.83%",
-  "24 symptoms indexed",
-  "12 disease profiles",
-  "Registrar · on-device admission log",
-  "Recall-first triage policy",
-  "Grad-CAM attention mapping",
-  "ISIC-2019 · 25,331 dermoscopy images",
-  "ABCDE rule enforcement",
-  "Zero data leaves your browser",
-  "Educational build · not a medical device",
+  "Educational demonstration only",
+  "External model links are references",
+  "Image panel output is simulated",
+  "Symptom scoring uses example profiles",
+  "No clinical validation",
+  "Patient records are held in app memory",
+  "Training sandbox uses bundled dataset rows",
+  "Symptom scores are not probabilities",
+  "Educational build · not clinically validated",
 ];

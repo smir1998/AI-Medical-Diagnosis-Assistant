@@ -6,11 +6,11 @@ export function ModelRegistry() {
       <div className="mb-8">
         <p className="font-mono text-xs font-bold tracking-widest text-teal">MODEL REGISTRY</p>
         <h2 className="mt-2 font-display text-4xl font-black tracking-tight sm:text-5xl">
-          Real weights, from the Hub<span className="text-teal">.</span>
+          External model references<span className="text-teal">.</span>
         </h2>
         <p className="mt-3 max-w-3xl text-sm leading-relaxed text-inksoft">
-          These are verified production models from Hugging Face with actual published benchmark scores —
-          not invented numbers. Each model card links to its live page.
+          These Hugging Face pages are references for further study. This demo does not download or run
+          these models, and their published metrics do not describe this app's outputs.
         </p>
       </div>
 
@@ -61,13 +61,13 @@ export function ModelRegistry() {
                 <dd className="font-semibold text-teal">{m.metric}</dd>
               </div>
               <div className="flex justify-between gap-2">
-                <dt className="shrink-0 text-inksoft/70">ACC</dt>
+                  <dt className="shrink-0 text-inksoft/70">PUBLISHED ACC</dt>
                 <dd className="tabular-nums font-bold text-ink">{m.acc.toFixed(2)}%</dd>
               </div>
             </dl>
 
             <p className="mt-3 border-t border-dashed border-ink/20 pt-2 text-center font-mono text-[9px] tracking-widest text-inksoft">
-              BACKS → {m.role.toUpperCase()}
+              REFERENCE → {m.role.toUpperCase()}
             </p>
           </a>
         ))}
@@ -78,7 +78,7 @@ export function ModelRegistry() {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mr-1 inline h-4 w-4 text-amber">
             <path d="M12 3L1.5 20h21L12 3zM12 9.5v5M12 17.5v.5" />
           </svg>
-          <strong className="text-amber">Honesty policy:</strong> The console runs deterministic teaching heads so every step stays interview-explainable. The metrics above are real published benchmark scores from the model cards — not invented numbers.
+          <strong className="text-amber">Model note:</strong> Model cards and their metrics belong to the linked projects. They are not evidence of this demo's accuracy or clinical performance.
         </p>
       </div>
     </section>

@@ -35,9 +35,10 @@ interface Props {
   onActivate: (id: string | null) => void;
   onDischarge: (id: string) => void;
   onRemove: (id: string) => void;
+  onClearAll: () => void;
 }
 
-export function PatientRegistry({ patients, activeId, onAdmit, onActivate, onDischarge, onRemove }: Props) {
+export function PatientRegistry({ patients, activeId, onAdmit, onActivate, onDischarge, onRemove, onClearAll }: Props) {
   const [draft, setDraft] = useState({
     name: "",
     age: "",
@@ -99,7 +100,12 @@ export function PatientRegistry({ patients, activeId, onAdmit, onActivate, onDis
   };
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
+    <div>
+      <p className="mb-5 border-l-4 border-amber bg-amber/10 px-4 py-3 text-xs leading-relaxed text-ink">
+        <strong>Demo data only.</strong> Do not enter real patient names, contact details, or health information.
+        Entries stay in this page's memory and are cleared when you reload or close it; they are not a medical record.
+      </p>
+      <div className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
       <form onSubmit={submit} className="border-2 border-ink bg-paper p-5 shadow-[8px_8px_0_0_rgba(11,47,45,0.85)]">
         <p className="mb-4 flex items-center gap-2 border-b-2 border-dashed border-ink/20 pb-3">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 text-teal">
@@ -165,11 +171,23 @@ export function PatientRegistry({ patients, activeId, onAdmit, onActivate, onDis
       </form>
 
       <div className="border-2 border-ink bg-paper shadow-[8px_8px_0_0_rgba(11,47,45,0.85)]">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b-2 border-ink bg-pine px-5 py-3 text-paper">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b-2 border-ink bg-pine px-5 py-3 text-paper">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <p className="font-mono text-[10px] font-bold tracking-[0.22em] text-mint">ADMISSION LOG</p>
           <span className="font-mono text-[9px] tracking-widest text-paper/50">
             IN {patients.filter((p) => p.status === "admitted").length} · D/C {patients.filter((p) => p.status === "discharged").length} · TOTAL {patients.length}
           </span>
+          </div>
+          <button
+            type="button"
+            disabled={patients.length === 0}
+            onClick={() => {
+              if (window.confirm("Clear all demo patients and the current report from this page?")) onClearAll();
+            }}
+            className="border border-paper/30 px-2 py-1 font-mono text-[9px] font-bold tracking-widest text-paper/75 transition-colors hover:border-alert hover:text-paper disabled:cursor-not-allowed disabled:opacity-35"
+          >
+            CLEAR ALL
+          </button>
         </div>
 
         {patients.length === 0 ? (
@@ -244,6 +262,7 @@ export function PatientRegistry({ patients, activeId, onAdmit, onActivate, onDis
             })}
           </ul>
         )}
+      </div>
       </div>
     </div>
   );

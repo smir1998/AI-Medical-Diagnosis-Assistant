@@ -3,7 +3,7 @@ import { CHAT_KB, CHAT_FALLBACK } from "../data/medical";
 
 export function Chatbot() {
   const [messages, setMessages] = useState([
-    { role: "bot", text: "MedLens NLP desk online. Ask about CNNs, normalization, transfer learning, or when to see a doctor." },
+    { role: "bot", text: "MedLens educational chatbot. Ask about this demo or general machine-learning terms. I cannot assess symptoms or give personal medical advice." },
   ]);
   const [input, setInput] = useState("");
 

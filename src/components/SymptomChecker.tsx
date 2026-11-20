@@ -2,7 +2,17 @@ import { useState } from "react";
 import { SYMPTOMS, DISEASES, RED_FLAG_SINGLE } from "../data/medical";
 
 interface Props {
-  onComplete: (result: any) => void;
+  onComplete: (result: SymptomAnalysisResult) => void;
+}
+
+export interface SymptomAnalysisResult {
+  results: Array<{
+    disease: (typeof DISEASES)[number];
+    score: number;
+  }>;
+  redFlags: string[];
+  duration: string;
+  severity: number;
 }
 
 export function SymptomChecker({ onComplete }: Props) {
@@ -36,9 +46,9 @@ export function SymptomChecker({ onComplete }: Props) {
     const results = scores
       .map((s, i) => ({
         disease: s.disease,
-        confidence: (exps[i] / sum) * 100,
+        score: (exps[i] / sum) * 100,
       }))
-      .sort((a, b) => b.confidence - a.confidence);
+      .sort((a, b) => b.score - a.score);
 
     const redFlags = [...selected].filter((id) => RED_FLAG_SINGLE.includes(id));
 
@@ -128,7 +138,7 @@ export function SymptomChecker({ onComplete }: Props) {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
           <path d="M9.5 3a3 3 0 0 0-3 3 3.2 3.2 0 0 0-2.4 5A3.2 3.2 0 0 0 6.5 16a3 3 0 0 0 3 3 2.8 2.8 0 0 0 2.5-1.5V4.5A3 3 0 0 0 9.5 3zM14.5 3a3 3 0 0 1 3 3 3.2 3.2 0 0 1 2.4 5 3.2 3.2 0 0 1-2.4 5 3 3 0 0 1-3 3 2.8 2.8 0 0 1-2.5-1.5V4.5A3 2.8 0 0 1 14.5 3z" />
         </svg>
-        Run neural analysis
+        Calculate symptom score
       </button>
     </div>
   );

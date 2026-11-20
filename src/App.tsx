@@ -83,7 +83,7 @@ export default function App() {
             <span className="text-alert">_</span>
           </h2>
           <p className="mt-4 max-w-2xl text-lg leading-relaxed text-inksoft">
-            An educational decision-support demo. Symptom scores use a small reference table, and
+            An educational software demo, not a clinical decision-support tool. Symptom scores use a small reference table, and
             radiology results are simulated; external model cards are listed for learning and are not
             loaded by this app.
           </p>

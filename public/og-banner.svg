@@ -28,7 +28,7 @@
 
   <!-- headline -->
   <text x="82" y="286" font-family="Archivo, 'IBM Plex Sans', sans-serif" font-size="58" font-weight="800" fill="#f5f1e6">Deep Learning in Health Care</text>
-  <text x="82" y="330" font-family="'IBM Plex Mono', monospace" font-size="21" fill="#8fe3cf" opacity="0.8">symptom encoder · chest X-ray CNN · dermoscopy · NLP desk</text>
+  <text x="82" y="330" font-family="'IBM Plex Mono', monospace" font-size="21" fill="#8fe3cf" opacity="0.8">symptom score demo · simulated image results · dataset training sandbox</text>
 
   <!-- spec chips -->
   <g font-family="'IBM Plex Mono', monospace" font-size="17" letter-spacing="1">

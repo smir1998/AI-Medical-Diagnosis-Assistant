@@ -29,6 +29,12 @@ Create a production build with:
 npm run build
 ```
 
+Run the unit and integration checks with Node.js 22 or newer:
+
+```bash
+npm test
+```
+
 ## Limitations
 
 The app has not been clinically validated. It does not provide diagnoses, treatment recommendations, or emergency triage. Image results are simulated, symptom scores are hand-weighted, and the trained model is a standalone educational exercise. Contact a qualified clinician for health concerns or local emergency services for emergencies.

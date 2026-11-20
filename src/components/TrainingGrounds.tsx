@@ -57,6 +57,41 @@ export function TrainingGrounds({ onTrained }: { onTrained: (m: TrainedModel) =>
             Standalone learning sandbox: this trained model does not power the Symptom Lab. Its scores describe
             performance on this dataset split and do not validate the symptom report.
           </p>
+          <details className="mt-4 max-w-3xl border border-mint/20 bg-pine/70 px-4 py-3 text-xs leading-relaxed text-paper/65">
+            <summary className="cursor-pointer font-mono font-bold tracking-wide text-mint">
+              Dataset card · source, labels, split, and limitations
+            </summary>
+            <div className="mt-3 grid gap-x-8 gap-y-3 sm:grid-cols-2">
+              <p>
+                <strong className="text-paper">Source and license:</strong> Disease Symptom Prediction by
+                Pranay Patil, bundled as <code>Training.csv</code>. The source lists CC BY-SA 4.0; attribution
+                and license details are in the <a className="underline decoration-mint/60 underline-offset-2" href={`${import.meta.env.BASE_URL}DATASET-NOTICE.md`}>dataset notice</a>.
+              </p>
+              <p>
+                <strong className="text-paper">Rows and labels:</strong> 4,920 examples across 41 source
+                <code>prognosis</code> labels. Each label is the dataset's target category, not a confirmed
+                patient diagnosis or outcome.
+              </p>
+              <p>
+                <strong className="text-paper">Features:</strong> 131 unique symptom indicators encoded as
+                binary values. Repeated header names are normalized and collapsed; the feature values are not
+                laboratory measurements or clinical observations with validated definitions.
+              </p>
+              <p>
+                <strong className="text-paper">Evaluation split:</strong> deterministic 80/20 holdout of unique
+                symptom profiles within each label; identical profiles stay together. After training, the panel
+                reports source rows, unique profiles, and grouped holdout support. This is an internal dataset
+                split, not an independent clinical test set.
+              </p>
+              <p className="sm:col-span-2">
+                <strong className="text-paper">Known gaps and intended use:</strong> this curated teaching
+                dataset is not a verified cohort of real patients and does not establish representativeness,
+                calibration, or clinical performance. It lacks validated patient-level context such as age,
+                sex, setting, and outcome follow-up. Use the trainer only to learn about fitting and evaluating
+                a classifier; do not use its output for healthcare decisions.
+              </p>
+            </div>
+          </details>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
@@ -152,7 +187,7 @@ export function TrainingGrounds({ onTrained }: { onTrained: (m: TrainedModel) =>
             {error && <p role="alert" className="mt-3 border border-alert/50 bg-alert/10 px-3 py-2 font-mono text-xs text-paper">{error}</p>}
             {model && (
               <p className="mt-3 font-mono text-[9px] leading-relaxed text-paper/45">
-                {model.trainingRows.toLocaleString()} training rows · {model.metrics.testRows.toLocaleString()} grouped holdout rows · {model.uniqueProfiles.toLocaleString()} unique symptom profiles · dataset scores are educational only.
+                {model.trainingRows.toLocaleString()} training rows · {model.metrics.testRows.toLocaleString()} grouped holdout rows · {model.uniqueProfiles.toLocaleString()} unique symptom profiles · {(model.sourceRows - model.uniqueProfiles).toLocaleString()} repeated rows · dataset scores are educational only.
               </p>
             )}
           </div>

@@ -53,6 +53,10 @@ export function TrainingGrounds({ onTrained }: { onTrained: (m: TrainedModel) =>
             profiles stay together in a deterministic, per-disease holdout so duplicate rows cannot leak
             across the split. No synthetic rows are created.
           </p>
+          <p className="mt-3 max-w-3xl border-l-2 border-mint/50 bg-paper/5 px-3 py-2 text-xs leading-relaxed text-paper/70">
+            Standalone learning sandbox: this trained model does not power the Symptom Lab. Its scores describe
+            performance on this dataset split and do not validate the symptom report.
+          </p>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">

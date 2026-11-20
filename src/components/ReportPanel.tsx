@@ -89,9 +89,10 @@ export function ReportPanel({ symptom, image, patient }: Props) {
                   <span className="text-inksoft">({symptom.results[0]?.disease.code})</span>
                 </p>
                 <p>
-                  <span className="text-inksoft">CONFIDENCE :</span>{" "}
-                  <span className="font-bold text-teal">{symptom.results[0]?.confidence.toFixed(1)}%</span>
+                  <span className="text-inksoft">RELATIVE SCORE :</span>{" "}
+                  <span className="font-bold text-teal">{symptom.results[0]?.score.toFixed(1)}%</span>
                 </p>
+                <p className="text-[10px] text-inksoft">Relative to this demo’s hand-weighted profiles; not a calibrated probability.</p>
               </div>
             )}
 

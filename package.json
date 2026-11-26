@@ -20,6 +20,7 @@
     "framer-motion": "^11.16.1",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.294.0",
+    "onnxruntime-web": "1.31.0-dev.20260914-8d85527a0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.18.3",
@@ -27,9 +28,9 @@
     "uuid": "^14.0.0"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
-    "@tailwindcss/vite": "^4.0.0",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",

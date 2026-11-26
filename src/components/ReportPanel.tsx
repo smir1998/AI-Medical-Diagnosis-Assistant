@@ -98,10 +98,17 @@ export function ReportPanel({ symptom, image, patient }: Props) {
 
             {image && (
               <div className="mt-3 space-y-2 border-t border-dashed border-ink/25 pt-3 font-mono text-xs leading-relaxed">
-                <p className="font-mono text-[10px] font-bold tracking-[0.28em] text-teal">── IMAGE PIXEL SUMMARY</p>
+                <p className="font-mono text-[10px] font-bold tracking-[0.28em] text-teal">── RADIOLOGY MODEL ESTIMATE</p>
                 <p>
                   <span className="text-inksoft">IMAGE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</span> {image.fileName}
                 </p>
+                {image.model && (
+                  <>
+                    <p><span className="text-inksoft">PNEUMONIA SCORE :</span>{" "}<span className="font-bold text-teal">{(image.model.probability * 100).toFixed(1)}%</span></p>
+                    <p><span className="text-inksoft">MODEL CUTOFF&nbsp;&nbsp;:</span> {(image.model.threshold * 100).toFixed(1)}% · {image.model.probability >= image.model.threshold ? "above cutoff" : "below cutoff"}</p>
+                    <p><span className="text-inksoft">MODEL&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</span> {image.model.modelId}</p>
+                  </>
+                )}
                 <p>
                   <span className="text-inksoft">DIMENSIONS&nbsp;&nbsp;:</span> {image.width} × {image.height} px
                 </p>
@@ -138,7 +145,7 @@ export function ReportPanel({ symptom, image, patient }: Props) {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mr-1 inline h-3 w-3 text-amber">
                   <path d="M12 3L1.5 20h21L12 3zM12 9.5v5M12 17.5v.5" />
                 </svg>
-                Educational use only — pixel statistics are descriptive and symptom scores are unvalidated examples. Neither is a medical interpretation or diagnosis; do not use these outputs for care decisions.
+                Research and education only — the image score is a pneumonia model estimate for frontal chest X-rays, not a diagnosis. Model performance varies across populations and sites; its heatmap shows activation, not a lesion. Symptom scores are unvalidated examples. Do not use these outputs for care decisions.
               </p>
             </div>
           </div>

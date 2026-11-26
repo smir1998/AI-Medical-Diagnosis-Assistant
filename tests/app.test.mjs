@@ -35,20 +35,20 @@ describe("active application wiring", () => {
     assert.match(registry, /CLEAR ALL/);
   });
 
-  test("image lab advertises pixel inspection without claiming disease detection", async () => {
+  test("radiology lab reports a pretrained score and model-generated heatmap with limits", async () => {
     const app = await read("src/App.tsx");
     const image = await read("src/components/ImageAnalysis.tsx");
     const report = await read("src/components/ReportPanel.tsx");
-    assert.match(app, /image pixel statistics without disease detection/i);
+    assert.match(app, /research-only pneumonia model/i);
     assert.match(image, /inspectImagePixels/);
-    assert.match(image, /Pixel inspection only/);
-    assert.match(image, /does not identify\s+anatomy/);
-    assert.match(image, /detect disease/);
-    assert.match(image, /run a trained radiology model/);
-    assert.match(image, /Inspect image pixels/);
-    assert.match(report, /IMAGE PIXEL SUMMARY/);
+    assert.match(image, /scoreFrontalChestXray/);
+    assert.match(image, /Grad-CAM heatmap/);
+    assert.match(image, /not a diagnosis/);
+    assert.match(image, /Run research model/);
+    assert.match(report, /RADIOLOGY MODEL ESTIMATE/);
+    assert.match(report, /PNEUMONIA SCORE/);
     assert.match(report, /MEAN LUMINANCE/);
-    assert.match(report, /pixel statistics are descriptive/);
-    assert.doesNotMatch(report, /PROBABILITIES|Pneumonia-pattern demo signal/);
+    assert.match(report, /not a diagnosis/);
+    assert.doesNotMatch(report, /Pneumonia-pattern demo signal/);
   });
 });

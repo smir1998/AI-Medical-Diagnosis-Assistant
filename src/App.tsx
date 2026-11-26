@@ -89,8 +89,8 @@ export default function App() {
           </h2>
           <p className="mt-4 max-w-2xl text-lg leading-relaxed text-inksoft">
             An educational software demo, not a clinical decision-support tool. Symptom scores use a small reference table, and
-            the radiology lab reports image pixel statistics without disease detection; external model cards
-            are listed for learning and are not loaded by this app.
+            the radiology lab runs a research-only pneumonia model on uploaded frontal chest X-rays. Scores and Grad-CAM heatmaps
+            are not diagnoses, and the model does not cover other diseases.
           </p>
         </div>
       </section>

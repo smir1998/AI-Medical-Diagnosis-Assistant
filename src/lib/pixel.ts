@@ -1,3 +1,5 @@
+import type { CxrModelResult } from "./cxrModel";
+
 export interface PixelStats {
   meanLuminance: number;
   luminanceStdDev: number;
@@ -12,6 +14,7 @@ export interface ImageResult extends PixelStats {
   width: number;
   height: number;
   runId: string;
+  model?: CxrModelResult;
 }
 
 /** Calculate descriptive grayscale statistics from RGBA pixel data. */
@@ -98,3 +101,4 @@ export function inspectImagePixels(
     image.src = dataUrl;
   });
 }
+

@@ -1,5 +1,5 @@
 import type { Patient } from "./PatientRegistry";
-import type { ImageResult } from "../lib/engine";
+import type { ImageResult } from "../lib/pixel";
 import type { SymptomAnalysisResult } from "./SymptomChecker";
 
 interface Props {
@@ -41,7 +41,7 @@ export function ReportPanel({ symptom, image, patient }: Props) {
             </span>
             <div>
               <p className="font-display text-base font-black tracking-tight">MedLens·AI — Patient Analysis Report</p>
-              <p className="font-mono text-[9px] tracking-[0.24em] text-mint/70">DECISION-SUPPORT DOCUMENT · NOT A CLINICAL DIAGNOSIS</p>
+              <p className="font-mono text-[9px] tracking-[0.24em] text-mint/70">EDUCATIONAL SUMMARY · NOT A CLINICAL INTERPRETATION</p>
             </div>
           </div>
           <div className="text-right font-mono text-[10px] leading-relaxed text-paper/70">
@@ -98,25 +98,31 @@ export function ReportPanel({ symptom, image, patient }: Props) {
 
             {image && (
               <div className="mt-3 space-y-2 border-t border-dashed border-ink/25 pt-3 font-mono text-xs leading-relaxed">
-                <p className="font-mono text-[10px] font-bold tracking-[0.28em] text-teal">── IMAGING · CHEST X-RAY</p>
+                <p className="font-mono text-[10px] font-bold tracking-[0.28em] text-teal">── IMAGE PIXEL SUMMARY</p>
                 <p>
-                  <span className="text-inksoft">STUDY&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</span> {image.fileName}
+                  <span className="text-inksoft">IMAGE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</span> {image.fileName}
                 </p>
                 <p>
-                  <span className="text-inksoft">SIMULATED FINDING :</span>{" "}
-                  <span className={`font-bold ${Number(image.pneumonia) > 50 ? "text-alert" : "text-teal"}`}>
-                    {Number(image.pneumonia) > 50 ? "Pneumonia-pattern demo signal" : "No demo signal"}
-                  </span>
+                  <span className="text-inksoft">DIMENSIONS&nbsp;&nbsp;:</span> {image.width} × {image.height} px
                 </p>
                 <p>
-                  <span className="text-inksoft">PROBABILITIES&nbsp;:</span> pneumonia {image.pneumonia}% / normal {image.normal}%
+                  <span className="text-inksoft">MEAN LUMINANCE :</span> {image.meanLuminance} / 255
+                </p>
+                <p>
+                  <span className="text-inksoft">LUMINANCE SD&nbsp;:</span> {image.luminanceStdDev} / 255
+                </p>
+                <p>
+                  <span className="text-inksoft">PIXEL RANGE&nbsp;&nbsp;:</span> {image.minLuminance}–{image.maxLuminance} / 255
+                </p>
+                <p>
+                  <span className="text-inksoft">SAMPLED PIXELS :</span> {image.sampledPixels.toLocaleString()}
                 </p>
               </div>
             )}
           </div>
 
           <div className="px-5 py-4">
-            <p className="mb-3 font-mono text-[10px] font-bold tracking-[0.28em] text-alert">── RECOMMENDATION</p>
+            <p className="mb-3 font-mono text-[10px] font-bold tracking-[0.28em] text-alert">── DEMO CONTEXT</p>
             <div className="space-y-3">
               {symptom?.results[0] && (
                 <div className="border-l-2 border-teal pl-3">
@@ -132,7 +138,7 @@ export function ReportPanel({ symptom, image, patient }: Props) {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mr-1 inline h-3 w-3 text-amber">
                   <path d="M12 3L1.5 20h21L12 3zM12 9.5v5M12 17.5v.5" />
                 </svg>
-                Educational simulation only — not a diagnosis, image interpretation, or clinical performance estimate. Do not use these results to make care decisions.
+                Educational use only — pixel statistics are descriptive and symptom scores are unvalidated examples. Neither is a medical interpretation or diagnosis; do not use these outputs for care decisions.
               </p>
             </div>
           </div>

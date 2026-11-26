@@ -35,13 +35,20 @@ describe("active application wiring", () => {
     assert.match(registry, /CLEAR ALL/);
   });
 
-  test("app and image outputs explicitly identify educational simulation", async () => {
+  test("image lab advertises pixel inspection without claiming disease detection", async () => {
     const app = await read("src/App.tsx");
     const image = await read("src/components/ImageAnalysis.tsx");
     const report = await read("src/components/ReportPanel.tsx");
-    assert.match(app, /not a clinical decision-support tool/i);
-    assert.match(image, /does not inspect image pixels or run a trained model/i);
-    assert.match(image, /Run demo simulation/);
-    assert.match(report, /Educational simulation only/);
+    assert.match(app, /image pixel statistics without disease detection/i);
+    assert.match(image, /inspectImagePixels/);
+    assert.match(image, /Pixel inspection only/);
+    assert.match(image, /does not identify\s+anatomy/);
+    assert.match(image, /detect disease/);
+    assert.match(image, /run a trained radiology model/);
+    assert.match(image, /Inspect image pixels/);
+    assert.match(report, /IMAGE PIXEL SUMMARY/);
+    assert.match(report, /MEAN LUMINANCE/);
+    assert.match(report, /pixel statistics are descriptive/);
+    assert.doesNotMatch(report, /PROBABILITIES|Pneumonia-pattern demo signal/);
   });
 });

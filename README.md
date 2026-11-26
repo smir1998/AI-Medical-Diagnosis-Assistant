@@ -6,7 +6,7 @@ MedLens AI is an educational demonstration of medical software concepts. It is n
 
 - **Patient list:** keeps sample patient entries in page memory, shows a demo-data notice, and provides a clear-all control. Data persistence and clinical record management are not implemented; do not enter real patient information.
 - **Symptom Lab:** produces hand-weighted relative scores from a small set of built-in disease profiles. These are not calibrated probabilities or diagnoses.
-- **Image panel:** demonstrates an upload and results interface. Findings are simulated; uploaded images are not processed by a trained image model.
+- **Radiology Lab:** reads local image pixels and reports dimensions, mean luminance, luminance variation, pixel range, and sample count. It does not classify the image or run a trained radiology model.
 - **Chatbot:** matches keywords to a small static set of educational answers. It is not a medical language model and cannot assess symptoms or urgency.
 - **Model Registry:** links to external model projects for reference. They are not integrated into this app.
 - **Training Grounds:** trains a separate multinomial logistic model on rows from the bundled `public/Training.csv` teaching dataset and reports metrics on a deterministic grouped holdout split. This model does not power Symptom Lab, and its metrics do not establish clinical performance.

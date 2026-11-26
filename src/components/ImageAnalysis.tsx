@@ -2,7 +2,7 @@ import { useState } from "react";
 import normalSample from "../assets/cxr-normal.svg";
 import pneumoniaSample from "../assets/cxr-pneumonia.svg";
 import { inspectImagePixels, type ImageResult } from "../lib/pixel";
-import { scoreFrontalChestXray } from "../lib/cxrModel";
+import { activationMapDataUrl, CXR_MODEL_CARD, scoreFrontalChestXray } from "../lib/cxrModel";
 
 interface Props {
   onComplete: (result: ImageResult) => void;
@@ -19,6 +19,7 @@ export function ImageAnalysis({ onComplete }: Props) {
   const [analyzing, setAnalyzing] = useState(false);
   const [modelProgress, setModelProgress] = useState<number | null>(null);
   const [showHeatmap, setShowHeatmap] = useState(true);
+  const [selectedFindingIndex, setSelectedFindingIndex] = useState(0);
   const [error, setError] = useState("");
 
   const loadSample = (src: string, name: string) => {
@@ -28,6 +29,7 @@ export function ImageAnalysis({ onComplete }: Props) {
     setResult(null);
     setModelProgress(null);
     setShowHeatmap(true);
+    setSelectedFindingIndex(0);
     setError("");
   };
 
@@ -36,6 +38,7 @@ export function ImageAnalysis({ onComplete }: Props) {
     if (!file) return;
     setError("");
     setResult(null);
+    setSelectedFindingIndex(0);
     setModelProgress(null);
     if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
       setImage(null);
@@ -78,6 +81,7 @@ export function ImageAnalysis({ onComplete }: Props) {
       }
       const analysis = await inspectImagePixels(source, fileName, image);
       const model = await scoreFrontalChestXray(image, setModelProgress);
+      setSelectedFindingIndex(model.findings[0]?.modelIndex ?? 0);
       analysis.model = model;
       setResult(analysis);
       onComplete(analysis);
@@ -87,6 +91,17 @@ export function ImageAnalysis({ onComplete }: Props) {
       setAnalyzing(false);
     }
   };
+
+  const selectedFinding = result?.model?.findings.find((finding) => finding.modelIndex === selectedFindingIndex)
+    ?? result?.model?.findings[0];
+  const overlayStyle = result
+    ? {
+        width: `${(Math.min(result.width, result.height) / result.width) * 100}%`,
+        height: `${(Math.min(result.width, result.height) / result.height) * 100}%`,
+        left: `${((result.width - Math.min(result.width, result.height)) / 2 / result.width) * 100}%`,
+        top: `${((result.height - Math.min(result.width, result.height)) / 2 / result.height) * 100}%`,
+      }
+    : undefined;
 
   return (
     <div className="space-y-5">
@@ -112,9 +127,10 @@ export function ImageAnalysis({ onComplete }: Props) {
       </div>
 
       <p className="border-l-2 border-amber bg-amber/10 px-3 py-2 text-xs leading-relaxed text-ink">
-        Research and education only. Upload a frontal chest X-ray to run a pretrained pneumonia model and view
-        its score and Grad-CAM heatmap. It does not diagnose patients, cover other diseases, or support care decisions.
-        Image inference stays in this browser. First use downloads the model weights (~56.5 MB) and ONNX browser runtime.
+        Research and education only. Upload a frontal chest X-ray to score 18 chest findings and view a class activation map
+        for each. These scores are independent model outputs, not calibrated probabilities or a diagnosis. This model only reads
+        chest X-rays; it cannot interpret other body parts or support care decisions. Image inference stays in this browser.
+        First use downloads the model weights (~28.3 MB) and ONNX browser runtime.
       </p>
       {error && <p role="alert" className="text-sm font-semibold text-alert">{error}</p>}
 
@@ -126,9 +142,10 @@ export function ImageAnalysis({ onComplete }: Props) {
                 <img src={image} alt="Image loaded for model analysis" className="block max-h-[340px] max-w-full border border-mint/25 object-contain" />
                 {result?.model && showHeatmap && (
                   <img
-                    src={result.model.heatmapDataUrl}
-                    alt="Grad-CAM heatmap overlay showing regions that most increased the model score"
-                    className="absolute inset-0 h-full w-full object-fill"
+                    src={activationMapDataUrl(result.model.camMaps[selectedFindingIndex] ?? result.model.camMaps[0] ?? [])}
+                    alt={`Class activation map for ${selectedFinding?.name ?? "selected finding"}; highlighted areas show model activation, not a lesion`}
+                    style={overlayStyle}
+                    className="pointer-events-none absolute object-fill"
                   />
                 )}
               </div>
@@ -150,27 +167,43 @@ export function ImageAnalysis({ onComplete }: Props) {
             {result ? (
               <>
                 <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2">
-                  <dt>Pneumonia model score</dt><dd className="font-bold text-amber">{(result.model!.probability * 100).toFixed(1)}%</dd>
-                  <dt>Model threshold</dt><dd>{(result.model!.threshold * 100).toFixed(1)}%</dd>
-                  <dt>Threshold comparison</dt><dd>{result.model!.probability >= result.model!.threshold ? "Above" : "Below"}</dd>
+                  <dt>Highest-scoring model finding</dt><dd className="font-bold text-amber">{selectedFinding?.name}</dd>
+                  <dt>Relative model score</dt><dd>{((selectedFinding?.score ?? 0) * 100).toFixed(1)} / 100</dd>
                   <dt>Image dimensions</dt><dd>{result.width} × {result.height}</dd>
                   <dt>Mean luminance</dt><dd>{result.meanLuminance} / 255</dd>
                   <dt>Luminance variation</dt><dd>{result.luminanceStdDev} / 255</dd>
                   <dt>Observed pixel range</dt><dd>{result.minLuminance}–{result.maxLuminance}</dd>
                   <dt>Pixels sampled</dt><dd>{result.sampledPixels.toLocaleString()}</dd>
-                  <dt>Model</dt><dd><a href="https://huggingface.co/emir-mutlu/pneumonia-cxr-convnext" target="_blank" rel="noreferrer" className="underline">ConvNeXt-Tiny · model card</a></dd>
+                  <dt>Model</dt><dd><a href={CXR_MODEL_CARD} target="_blank" rel="noreferrer" className="underline">XRV DenseNet · 18 findings</a></dd>
                 </dl>
+                <div className="mt-4 border-t border-mint/15 pt-3">
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-mint/60">Ranked model outputs · select to inspect map</p>
+                  <ol className="max-h-56 space-y-1 overflow-y-auto pr-1">
+                    {result.model!.findings.map((finding, index) => (
+                      <li key={finding.name}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedFindingIndex(finding.modelIndex)}
+                          aria-pressed={selectedFindingIndex === finding.modelIndex}
+                          className="grid w-full grid-cols-[1fr_auto] gap-3 px-2 py-1 text-left aria-pressed:bg-teal/20"
+                        >
+                          <span>{index + 1}. {finding.name}</span><span>{(finding.score * 100).toFixed(1)}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button type="button" onClick={() => setShowHeatmap(false)} aria-pressed={!showHeatmap} className="border border-mint/30 px-2 py-1 text-[10px] aria-pressed:bg-teal">Original</button>
-                  <button type="button" onClick={() => setShowHeatmap(true)} aria-pressed={showHeatmap} className="border border-mint/30 px-2 py-1 text-[10px] aria-pressed:bg-teal">Grad-CAM overlay</button>
+                  <button type="button" onClick={() => setShowHeatmap(true)} aria-pressed={showHeatmap} className="border border-mint/30 px-2 py-1 text-[10px] aria-pressed:bg-teal">Activation overlay</button>
                 </div>
               </>
             ) : (
-              <p className="text-mint/45">Model score and heatmap will appear after a frontal chest X-ray is analyzed.</p>
+              <p className="text-mint/45">The ranked findings and activation map will appear after a frontal chest X-ray is analyzed.</p>
             )}
             <p className="mt-4 border-t border-mint/15 pt-2 text-[10px] text-mint/45">
               {result?.model
-                ? "Research only; not a diagnosis. Grad-CAM shows model activation, not a lesion. Performance is site- and population-dependent: the model card reports 7.1% sensitivity on one external pediatric cohort."
+                ? "Research only; not a disease conclusion. Scores are independent and are not calibrated probabilities. The activation map is coarse model attention, not a lesion outline. Performance varies across datasets and populations."
                 : "Synthetic samples support pixel practice only; they are not scored by the trained model."}
             </p>
           </div>

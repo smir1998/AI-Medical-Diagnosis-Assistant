@@ -35,20 +35,26 @@ describe("active application wiring", () => {
     assert.match(registry, /CLEAR ALL/);
   });
 
-  test("radiology lab reports a pretrained score and model-generated heatmap with limits", async () => {
+  test("radiology lab reports multi-finding model scores and selectable activation maps with limits", async () => {
     const app = await read("src/App.tsx");
     const image = await read("src/components/ImageAnalysis.tsx");
     const report = await read("src/components/ReportPanel.tsx");
-    assert.match(app, /research-only pneumonia model/i);
+    const model = await read("src/lib/cxrModel.ts");
+    assert.match(app, /scores 18 findings/i);
     assert.match(image, /inspectImagePixels/);
     assert.match(image, /scoreFrontalChestXray/);
-    assert.match(image, /Grad-CAM heatmap/);
-    assert.match(image, /not a diagnosis/);
+    assert.match(image, /activationMapDataUrl/);
+    assert.match(image, /independent model outputs/i);
+    assert.match(image, /findings\.map/);
+    assert.match(image, /not calibrated probabilities or a diagnosis/);
+    assert.match(model, /CHEST_FINDINGS = \[/);
+    assert.equal((model.match(/^  "[^\"]+",$/gm) ?? []).length, 18);
     assert.match(image, /Run research model/);
     assert.match(report, /RADIOLOGY MODEL ESTIMATE/);
-    assert.match(report, /PNEUMONIA SCORE/);
+    assert.match(report, /HIGHEST MODEL SCORES/);
+    assert.match(report, /18 chest X-ray findings/);
     assert.match(report, /MEAN LUMINANCE/);
-    assert.match(report, /not a diagnosis/);
+    assert.match(report, /disease diagnosis/);
     assert.doesNotMatch(report, /Pneumonia-pattern demo signal/);
   });
 });

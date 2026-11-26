@@ -19,8 +19,9 @@ describe("README reflects the current educational app", () => {
 
   test("documents current feature behavior without advertising removed modules", () => {
     assert.match(readme, /hand-weighted relative scores/);
-    assert.match(readme, /pretrained binary pneumonia classifier/);
-    assert.match(readme, /Grad-CAM activation map/);
+    assert.match(readme, /densenet121-res224-all/);
+    assert.match(readme, /ranks 18 independently-scored findings/);
+    assert.match(readme, /class activation map/);
     assert.match(readme, /inference runs in the browser/);
     assert.match(readme, /separate multinomial logistic model/);
     assert.match(readme, /does not power Symptom Lab/);

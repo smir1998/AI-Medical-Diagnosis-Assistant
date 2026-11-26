@@ -1,14 +1,40 @@
-export const CXR_MODEL_ID = "emir-mutlu/pneumonia-cxr-convnext";
-const MODEL_REVISION = "8b1c262f34b607ea7de88186a9ac42aea036100d";
-const MODEL_URL = `https://huggingface.co/${CXR_MODEL_ID}/resolve/${MODEL_REVISION}/model_browser.onnx`;
-const MODEL_SIZE = 224;
-const CACHE_SIZE = 256;
-const THRESHOLD = 0.576;
+export const CXR_MODEL_ID = "TorchXRayVision densenet121-res224-all";
+export const CXR_MODEL_CARD = "https://mlmed.org/torchxrayvision/models.html";
+const MODEL_ASSET = "models/xrv-densenet121-all.onnx";
+const MODEL_REVISION = "TorchXRayVision 1.4.0 / upstream v1 weights";
+const INPUT_SIZE = 224;
+const CAM_SIZE = 7;
+
+export const CHEST_FINDINGS = [
+  "Atelectasis",
+  "Consolidation",
+  "Infiltration",
+  "Pneumothorax",
+  "Edema",
+  "Emphysema",
+  "Fibrosis",
+  "Effusion",
+  "Pneumonia",
+  "Pleural thickening",
+  "Cardiomegaly",
+  "Nodule",
+  "Mass",
+  "Hernia",
+  "Lung lesion",
+  "Fracture",
+  "Lung opacity",
+  "Enlarged cardiomediastinum",
+] as const;
+
+export interface CxrFinding {
+  name: (typeof CHEST_FINDINGS)[number];
+  score: number;
+  modelIndex: number;
+}
 
 export interface CxrModelResult {
-  probability: number;
-  threshold: number;
-  heatmapDataUrl: string;
+  findings: CxrFinding[];
+  camMaps: number[][];
   modelId: string;
   modelRevision: string;
 }
@@ -26,8 +52,7 @@ function coefficients(inputSize: number, outputSize: number) {
   const scale = inputSize / outputSize;
   const filterScale = Math.max(scale, 1);
   const weights: Array<[number, Int32Array]> = [];
-  const precision = 22;
-  const one = 1 << precision;
+  const one = 1 << 22;
 
   for (let output = 0; output < outputSize; output++) {
     const center = (output + 0.5) * scale;
@@ -55,11 +80,9 @@ function resizeHorizontal(source: Uint8Array, width: number, height: number, out
   const output = new Uint8Array(outputWidth * height);
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < outputWidth; x++) {
-      const [start, coefficientsForPixel] = weights[x];
+      const [start, coeffs] = weights[x];
       let sum = 1 << 21;
-      for (let i = 0; i < coefficientsForPixel.length; i++) {
-        sum += source[y * width + start + i] * coefficientsForPixel[i];
-      }
+      for (let i = 0; i < coeffs.length; i++) sum += source[y * width + start + i] * coeffs[i];
       output[y * outputWidth + x] = Math.max(0, Math.min(255, Math.floor(sum / 2 ** 22)));
     }
   }
@@ -70,65 +93,30 @@ function resizeVertical(source: Uint8Array, width: number, height: number, outpu
   const weights = coefficients(height, outputHeight);
   const output = new Uint8Array(width * outputHeight);
   for (let y = 0; y < outputHeight; y++) {
-    const [start, coefficientsForPixel] = weights[y];
+    const [start, coeffs] = weights[y];
     for (let x = 0; x < width; x++) {
       let sum = 1 << 21;
-      for (let i = 0; i < coefficientsForPixel.length; i++) {
-        sum += source[(start + i) * width + x] * coefficientsForPixel[i];
-      }
+      for (let i = 0; i < coeffs.length; i++) sum += source[(start + i) * width + x] * coeffs[i];
       output[y * width + x] = Math.max(0, Math.min(255, Math.floor(sum / 2 ** 22)));
     }
   }
   return output;
 }
 
-/** Pillow-compatible two-pass bilinear resize used by the published model demo. */
-function resizeGray(source: Uint8Array, width: number, height: number, outputSize: number) {
-  const horizontal = width === outputSize ? source : resizeHorizontal(source, width, height, outputSize);
-  return height === outputSize ? horizontal : resizeVertical(horizontal, outputSize, height, outputSize);
+/** Center crop to the square framing used for chest radiographs, then bilinear resize. */
+function centerCropAndResize(source: Uint8Array, width: number, height: number) {
+  const side = Math.min(width, height);
+  const left = Math.floor((width - side) / 2);
+  const top = Math.floor((height - side) / 2);
+  const square = new Uint8Array(side * side);
+  for (let y = 0; y < side; y++) {
+    square.set(source.subarray((top + y) * width + left, (top + y) * width + left + side), y * side);
+  }
+  const horizontal = side === INPUT_SIZE ? square : resizeHorizontal(square, side, side, INPUT_SIZE);
+  return side === INPUT_SIZE ? horizontal : resizeVertical(horizontal, INPUT_SIZE, side, INPUT_SIZE);
 }
 
-async function createSession(onProgress?: ProgressHandler): Promise<InferenceSession> {
-  const response = await fetch(MODEL_URL);
-  if (!response.ok) throw new Error(`Could not download the radiology model (HTTP ${response.status}).`);
-  if (!response.body) throw new Error("This browser cannot stream the model download.");
-
-  const expectedBytes = Number(response.headers.get("content-length")) || 0;
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let receivedBytes = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    receivedBytes += value.length;
-    if (expectedBytes) onProgress?.(Math.min(100, Math.round((receivedBytes / expectedBytes) * 100)));
-  }
-
-  const modelBytes = new Uint8Array(receivedBytes);
-  let offset = 0;
-  for (const chunk of chunks) {
-    modelBytes.set(chunk, offset);
-    offset += chunk.length;
-  }
-  const ort = await loadOrt();
-  return ort.InferenceSession.create(modelBytes, {
-    executionProviders: ["wasm"],
-    graphOptimizationLevel: "all",
-  });
-}
-
-async function getSession(onProgress?: ProgressHandler) {
-  if (!sessionPromise) {
-    sessionPromise = createSession(onProgress).catch((error) => {
-      sessionPromise = undefined;
-      throw error;
-    });
-  }
-  return sessionPromise;
-}
-
-async function imageToGrayPixels(dataUrl: string) {
+async function imageToModelInput(dataUrl: string) {
   const image = new Image();
   image.src = dataUrl;
   await image.decode();
@@ -151,55 +139,113 @@ async function imageToGrayPixels(dataUrl: string) {
     gray[i] = (rgba[j] * 19595 + rgba[j + 1] * 38470 + rgba[j + 2] * 7471 + 0x8000) >> 16;
   }
 
-  return { gray, width, height };
+  const resized = centerCropAndResize(gray, width, height);
+  // TorchXRayVision's image pipeline scales 8-bit gray values from [0, 255] to [-1, 1].
+  return Float32Array.from(resized, (value) => (value / 255) * 2 - 1);
 }
 
-function makeHeatmap(cam: ArrayLike<number>) {
-  const canvas = document.createElement("canvas");
-  canvas.width = MODEL_SIZE;
-  canvas.height = MODEL_SIZE;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("This browser could not draw the model heatmap.");
-  const pixels = context.createImageData(MODEL_SIZE, MODEL_SIZE);
+async function createSession(onProgress?: ProgressHandler): Promise<InferenceSession> {
+  const modelUrl = `${import.meta.env.BASE_URL}${MODEL_ASSET}`;
+  const response = await fetch(modelUrl);
+  if (!response.ok) throw new Error(`Could not load the chest X-ray model (HTTP ${response.status}).`);
+  if (!response.body) throw new Error("This browser cannot stream the chest X-ray model.");
 
-  for (let i = 0; i < MODEL_SIZE * MODEL_SIZE; i++) {
-    const strength = Math.max(0, Math.min(1, Number(cam[i]) || 0));
-    // Compact inferno-like scale with transparent low-activation areas.
-    const t = strength;
-    const base = i * 4;
-    pixels.data[base] = Math.round(255 * Math.min(1, Math.max(0, 1.5 * t - 0.25)));
-    pixels.data[base + 1] = Math.round(255 * Math.min(1, Math.max(0, 1.5 - Math.abs(2 * t - 1.0) * 1.5)));
-    pixels.data[base + 2] = Math.round(255 * Math.min(1, Math.max(0, 1.1 - 1.7 * t)));
-    pixels.data[base + 3] = Math.round(255 * Math.min(1, Math.max(0, (t - 0.15) / 0.85)) ** 0.8);
+  const expectedBytes = Number(response.headers.get("content-length")) || 0;
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let receivedBytes = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    receivedBytes += value.length;
+    if (expectedBytes) onProgress?.(Math.min(100, Math.round((receivedBytes / expectedBytes) * 100)));
   }
-  context.putImageData(pixels, 0, 0);
-  return canvas.toDataURL("image/png");
+
+  const modelBytes = new Uint8Array(receivedBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    modelBytes.set(chunk, offset);
+    offset += chunk.length;
+  }
+
+  const ort = await loadOrt();
+  ort.env.wasm.numThreads = 1;
+  return ort.InferenceSession.create(modelBytes, {
+    executionProviders: ["wasm"],
+    graphOptimizationLevel: "all",
+  });
 }
 
-/** Run the published CXR model entirely in this browser; uploaded pixels are not sent to a server. */
+async function getSession(onProgress?: ProgressHandler) {
+  if (!sessionPromise) {
+    sessionPromise = createSession(onProgress).catch((error) => {
+      sessionPromise = undefined;
+      throw error;
+    });
+  }
+  return sessionPromise;
+}
+
+/** Score all 18 findings with the pretrained model; uploaded image pixels stay in-browser. */
 export async function scoreFrontalChestXray(
   dataUrl: string,
   onProgress?: ProgressHandler,
 ): Promise<CxrModelResult> {
-  const { gray, width, height } = await imageToGrayPixels(dataUrl);
-  const atCacheSize = resizeGray(gray, width, height, CACHE_SIZE);
-  const modelPixels = resizeGray(atCacheSize, CACHE_SIZE, CACHE_SIZE, MODEL_SIZE);
-  const input = Float32Array.from(modelPixels, (value) => value / 255);
+  const input = await imageToModelInput(dataUrl);
   const [session, ort] = await Promise.all([getSession(onProgress), loadOrt()]);
   const output = await session.run({
-    image: new ort.Tensor("float32", input, [1, 1, MODEL_SIZE, MODEL_SIZE]),
+    image: new ort.Tensor("float32", input, [1, 1, INPUT_SIZE, INPUT_SIZE]),
   });
-  const probability = Number(output.probability?.data[0]);
-  const cam = output.cam?.data as ArrayLike<number> | undefined;
-  if (!Number.isFinite(probability) || probability < 0 || probability > 1 || !cam || cam.length !== MODEL_SIZE * MODEL_SIZE) {
-    throw new Error("The radiology model returned an unexpected result.");
+  const rawScores = output.scores?.data as ArrayLike<number> | undefined;
+  const rawCams = output.cams?.data as ArrayLike<number> | undefined;
+  const expectedCams = CHEST_FINDINGS.length * CAM_SIZE * CAM_SIZE;
+  if (!rawScores || rawScores.length !== CHEST_FINDINGS.length || !rawCams || rawCams.length !== expectedCams) {
+    throw new Error("The chest X-ray model returned an unexpected result.");
   }
 
+  const findings = CHEST_FINDINGS.map((name, index) => ({
+    name,
+    score: Number(rawScores[index]),
+    modelIndex: index,
+  })).sort((a, b) => b.score - a.score);
+  const camMaps = CHEST_FINDINGS.map((_, findingIndex) =>
+    Array.from({ length: CAM_SIZE * CAM_SIZE }, (_, cellIndex) =>
+      Number(rawCams[findingIndex * CAM_SIZE * CAM_SIZE + cellIndex]),
+    ),
+  );
+
   return {
-    probability,
-    threshold: THRESHOLD,
-    heatmapDataUrl: makeHeatmap(cam),
+    findings,
+    camMaps,
     modelId: CXR_MODEL_ID,
     modelRevision: MODEL_REVISION,
   };
+}
+
+export function activationMapDataUrl(cam: number[]) {
+  const source = document.createElement("canvas");
+  source.width = CAM_SIZE;
+  source.height = CAM_SIZE;
+  const sourceContext = source.getContext("2d");
+  if (!sourceContext) throw new Error("This browser could not render the heatmap.");
+  const sourcePixels = sourceContext.createImageData(CAM_SIZE, CAM_SIZE);
+  for (let i = 0; i < CAM_SIZE * CAM_SIZE; i++) {
+    const strength = Math.max(0, Math.min(1, cam[i] ?? 0));
+    const base = i * 4;
+    sourcePixels.data[base] = Math.round(255 * Math.min(1, Math.max(0, 1.5 * strength - 0.25)));
+    sourcePixels.data[base + 1] = Math.round(255 * Math.min(1, Math.max(0, 1.5 - Math.abs(2 * strength - 1) * 1.5)));
+    sourcePixels.data[base + 2] = Math.round(255 * Math.min(1, Math.max(0, 1.1 - 1.7 * strength)));
+    sourcePixels.data[base + 3] = Math.round(255 * Math.min(1, Math.max(0, (strength - 0.15) / 0.85)) ** 0.8);
+  }
+  sourceContext.putImageData(sourcePixels, 0, 0);
+
+  const output = document.createElement("canvas");
+  output.width = INPUT_SIZE;
+  output.height = INPUT_SIZE;
+  const context = output.getContext("2d");
+  if (!context) throw new Error("This browser could not render the heatmap.");
+  context.imageSmoothingEnabled = true;
+  context.drawImage(source, 0, 0, INPUT_SIZE, INPUT_SIZE);
+  return output.toDataURL("image/png");
 }

@@ -104,8 +104,10 @@ export function ReportPanel({ symptom, image, patient }: Props) {
                 </p>
                 {image.model && (
                   <>
-                    <p><span className="text-inksoft">PNEUMONIA SCORE :</span>{" "}<span className="font-bold text-teal">{(image.model.probability * 100).toFixed(1)}%</span></p>
-                    <p><span className="text-inksoft">MODEL CUTOFF&nbsp;&nbsp;:</span> {(image.model.threshold * 100).toFixed(1)}% · {image.model.probability >= image.model.threshold ? "above cutoff" : "below cutoff"}</p>
+                    <p className="font-bold">HIGHEST MODEL SCORES</p>
+                    {image.model.findings.slice(0, 5).map((finding) => (
+                      <p key={finding.name}><span className="text-inksoft">{finding.name.toUpperCase()} :</span>{" "}{(finding.score * 100).toFixed(1)} / 100</p>
+                    ))}
                     <p><span className="text-inksoft">MODEL&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</span> {image.model.modelId}</p>
                   </>
                 )}
@@ -145,7 +147,7 @@ export function ReportPanel({ symptom, image, patient }: Props) {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mr-1 inline h-3 w-3 text-amber">
                   <path d="M12 3L1.5 20h21L12 3zM12 9.5v5M12 17.5v.5" />
                 </svg>
-                Research and education only — the image score is a pneumonia model estimate for frontal chest X-rays, not a diagnosis. Model performance varies across populations and sites; its heatmap shows activation, not a lesion. Symptom scores are unvalidated examples. Do not use these outputs for care decisions.
+                Research and education only - these are independent model scores for 18 chest X-ray findings, not calibrated probabilities or a disease diagnosis. The heatmap shows coarse model activation, not a lesion. This model cannot read other body parts. Model performance varies across datasets and populations. Do not use these outputs for care decisions.
               </p>
             </div>
           </div>

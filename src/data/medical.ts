@@ -215,12 +215,12 @@ export const CHAT_KB: ChatEntry[] = [
   {
     keys: ["cnn", "convolutional", "convolution"],
     answer:
-      "A convolutional neural network (CNN) learns spatial image patterns through convolution filters and pooling. The Radiology Lab runs a pretrained ConvNeXt-Tiny model for research and education that estimates pneumonia score from frontal chest X-rays; it is not validated for patient care.",
+      "A convolutional neural network (CNN) learns spatial image patterns through convolution filters and pooling. The Radiology Lab runs TorchXRayVision DenseNet for research and education, returning independent scores for 18 frontal chest X-ray findings. The scores are not calibrated probabilities or a disease diagnosis.",
   },
   {
     keys: ["normalize", "normalization", "255", "pixel"],
     answer:
-      "Image normalization often rescales pixel values, for example from [0, 255] to [0, 1], before model inference. The radiology model converts the image to grayscale, resizes it, and scales pixels to [0, 1] as its training pipeline requires.",
+      "Image normalization often rescales pixel values before model inference. The radiology model converts a frontal chest X-ray to grayscale, center-crops and resizes it to 224 × 224, then scales pixels to [-1, 1] for inference.",
   },
   {
     keys: ["transfer", "resnet", "mobilenet", "pretrained", "pre-trained"],
@@ -250,12 +250,12 @@ export const CHAT_KB: ChatEntry[] = [
   {
     keys: ["x-ray", "xray", "upload", "image", "prepare"],
     answer:
-      "The Radiology Lab runs a research-only pretrained model that estimates pneumonia score on uploaded frontal chest X-rays and shows Grad-CAM activation. It does not diagnose patients; it does not cover other diseases or image types; and model performance varies across hospitals, age groups, and views.",
+      "The Radiology Lab runs a research-only TorchXRayVision DenseNet model on uploaded frontal chest X-rays. It returns independent scores for 18 findings and a class activation map for the selected finding. Scores are not calibrated probabilities or a patient-specific diagnosis, and the model cannot read other body parts. Performance varies across datasets and populations.",
   },
   {
     keys: ["how does", "how it works", "work", "architecture", "pipeline"],
     answer:
-      "The active app has a patient list, a hand-weighted symptom scoring demo, a research-only pneumonia model for frontal chest X-rays, a keyword-based educational chatbot, a report view, a model reference list, and a separate SGD training sandbox. The sandbox trains on bundled symptom rows but does not power the Symptom Lab. The image model runs locally in the browser and its score is not a diagnosis.",
+      "The active app has a patient list, a hand-weighted symptom scoring demo, a research-only 18-finding chest X-ray model, a keyword-based educational chatbot, a report view, a model reference list, and a separate SGD training sandbox. The sandbox trains on bundled symptom rows but does not power the Symptom Lab. Image inference runs locally in the browser; model scores are not calibrated probabilities or diagnoses.",
   },
   {
     keys: ["deploy", "streamlit", "fastapi", "render", "railway"],
@@ -265,7 +265,7 @@ export const CHAT_KB: ChatEntry[] = [
   {
     keys: ["hugging", "hf", "which model", "model zoo", "biomed", "pubmedbert", "meditron", "registry"],
     answer:
-      "Model Registry contains links to external model projects for reference. Those projects and their published metrics are not integrated into this app and do not validate its outputs. The only trained model in the app is the standalone dataset-training sandbox.",
+      "Model Registry contains links to external model projects for reference. Those projects and their published metrics do not validate this app's outputs. The Radiology Lab runs a pretrained multi-finding chest X-ray model; the separate Training Grounds sandbox trains its own model on bundled symptom rows.",
   },
 ];
 

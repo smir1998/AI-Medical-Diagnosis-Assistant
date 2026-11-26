@@ -89,8 +89,8 @@ export default function App() {
           </h2>
           <p className="mt-4 max-w-2xl text-lg leading-relaxed text-inksoft">
             An educational software demo, not a clinical decision-support tool. Symptom scores use a small reference table, and
-            the radiology lab runs a research-only pneumonia model on uploaded frontal chest X-rays. Scores and Grad-CAM heatmaps
-            are not diagnoses, and the model does not cover other diseases.
+            the radiology lab scores 18 findings on uploaded frontal chest X-rays using a research model. These outputs and
+            activation heatmaps are not diagnoses, and this chest model cannot read other body parts.
           </p>
         </div>
       </section>

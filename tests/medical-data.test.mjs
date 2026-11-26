@@ -38,12 +38,12 @@ describe("medical demo copy and reference data", () => {
     assert.match(copy, /no clinical validation/i);
   });
 
-  test("chatbot copy accurately describes pixel features and limits", () => {
+  test("chatbot copy describes trained radiology model and clinical limits", () => {
     const answer = (key) => CHAT_KB.find((entry) => entry.keys.includes(key))?.answer ?? "";
-    assert.match(answer("cnn"), /does not run a CNN/i);
-    assert.match(answer("image"), /reads uploaded image pixels/i);
-    assert.match(answer("architecture"), /image pixel-statistics lab/i);
-    assert.match(answer("architecture"), /does not run a trained radiology or dermoscopy model/i);
+    assert.match(answer("cnn"), /pretrained ConvNeXt-Tiny/i);
+    assert.match(answer("image"), /pneumonia score/i);
+    assert.match(answer("architecture"), /research-only pneumonia model/i);
+    assert.match(answer("architecture"), /score is not a diagnosis/i);
     assert.match(answer("validated"), /not.*clinically validated/i);
     assert.match(answer("urgent"), /cannot assess urgency/i);
     assert.match(answer("fever"), /cannot provide personal treatment advice/i);

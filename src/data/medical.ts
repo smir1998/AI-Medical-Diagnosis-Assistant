@@ -215,12 +215,12 @@ export const CHAT_KB: ChatEntry[] = [
   {
     keys: ["cnn", "convolutional", "convolution"],
     answer:
-      "A convolutional neural network (CNN) is an image-model architecture that learns spatial patterns through convolution filters and pooling. This demo does not run a CNN: its image lab computes descriptive pixel brightness statistics and does not assess medical images.",
+      "A convolutional neural network (CNN) learns spatial image patterns through convolution filters and pooling. The Radiology Lab runs a pretrained ConvNeXt-Tiny model for research and education that estimates pneumonia score from frontal chest X-rays; it is not validated for patient care.",
   },
   {
     keys: ["normalize", "normalization", "255", "pixel"],
     answer:
-      "Image normalization often rescales pixel values, for example from [0, 255] to [0, 1], before model inference. The demo's pixel lab measures grayscale luminance from image pixels but does not normalize data for model inference.",
+      "Image normalization often rescales pixel values, for example from [0, 255] to [0, 1], before model inference. The radiology model converts the image to grayscale, resizes it, and scales pixels to [0, 1] as its training pipeline requires.",
   },
   {
     keys: ["transfer", "resnet", "mobilenet", "pretrained", "pre-trained"],
@@ -235,7 +235,7 @@ export const CHAT_KB: ChatEntry[] = [
   {
     keys: ["accurate", "reliable", "trust", "validated", "how good", "limits"],
     answer:
-      "This is an educational demonstration, not a medical device or a clinically validated system. Symptom scores use hand-weighted example profiles; image results are descriptive pixel statistics only; and Training Grounds evaluates a separate model on a held-out portion of a bundled teaching dataset. None of these results is a diagnosis or evidence of clinical performance.",
+      "This is an educational demonstration, not a medical device or a clinically validated system. Symptom scores use hand-weighted example profiles; the radiology model is research-only and has limited external validation; and Training Grounds evaluates a separate model on a bundled teaching dataset. None of these results is a diagnosis or evidence of clinical performance for this app.",
   },
   {
     keys: ["doctor", "see a doctor", "urgent", "emergency", "hospital", "when to"],
@@ -250,12 +250,12 @@ export const CHAT_KB: ChatEntry[] = [
   {
     keys: ["x-ray", "xray", "upload", "image", "prepare"],
     answer:
-      "The image lab reads uploaded image pixels and reports descriptive luminance statistics. It does not identify anatomy, detect disease, run a trained radiology model, or provide a medical interpretation.",
+      "The Radiology Lab runs a research-only pretrained model that estimates pneumonia score on uploaded frontal chest X-rays and shows Grad-CAM activation. It does not diagnose patients; it does not cover other diseases or image types; and model performance varies across hospitals, age groups, and views.",
   },
   {
     keys: ["how does", "how it works", "work", "architecture", "pipeline"],
     answer:
-      "The active app has a patient list, a hand-weighted symptom scoring demo, an image pixel-statistics lab, a keyword-based educational chatbot, a report view, a model reference list, and a separate SGD training sandbox. The sandbox trains on bundled symptom rows but does not power the Symptom Lab. The app does not run a trained radiology or dermoscopy model.",
+      "The active app has a patient list, a hand-weighted symptom scoring demo, a research-only pneumonia model for frontal chest X-rays, a keyword-based educational chatbot, a report view, a model reference list, and a separate SGD training sandbox. The sandbox trains on bundled symptom rows but does not power the Symptom Lab. The image model runs locally in the browser and its score is not a diagnosis.",
   },
   {
     keys: ["deploy", "streamlit", "fastapi", "render", "railway"],

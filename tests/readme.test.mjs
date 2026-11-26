@@ -19,7 +19,8 @@ describe("README reflects the current educational app", () => {
 
   test("documents current feature behavior without advertising removed modules", () => {
     assert.match(readme, /hand-weighted relative scores/);
-    assert.match(readme, /simulated; uploaded images are not processed by a trained image model/);
+    assert.match(readme, /reads local image pixels and reports dimensions, mean luminance/);
+    assert.match(readme, /does not classify the image or run a trained radiology model/);
     assert.match(readme, /separate multinomial logistic model/);
     assert.match(readme, /does not power Symptom Lab/);
     assert.match(readme, /matches keywords to a small static set of educational answers/);

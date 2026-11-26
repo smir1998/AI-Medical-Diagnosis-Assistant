@@ -1,68 +1,100 @@
-/* ------------------------------------------------------------------ */
-/*  Radiograph feature-statistics head.                                */
-/*  Reads the ACTUAL uploaded image: measures lung-band opacity and    */
-/*  heterogeneity on a downscaled canvas, then maps them through a     */
-/*  fixed logistic (pneumonia presents as increased airspace opacity). */
-/*  Deterministic per image. Educational — not a trained CNN.          */
-/* ------------------------------------------------------------------ */
-
-export interface RadiographFeatures {
-  opacity: number; // mean luminance of the mid-lung band, 0..1
-  heterogeneity: number; // luminance std-dev, 0..1
-  size: number;
+export interface PixelStats {
+  meanLuminance: number;
+  luminanceStdDev: number;
+  minLuminance: number;
+  maxLuminance: number;
+  sampledPixels: number;
 }
 
-export function radiographStats(dataUrl: string): Promise<RadiographFeatures> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    const fallback: RadiographFeatures = { opacity: 0.3, heterogeneity: 0.15, size: 0 };
-    img.onload = () => {
-      try {
-        const c = document.createElement("canvas");
-        c.width = 64;
-        c.height = 64;
-        const ctx = c.getContext("2d");
-        if (!ctx) return resolve(fallback);
-        ctx.drawImage(img, 0, 0, 64, 64);
-        const data = ctx.getImageData(0, 0, 64, 64).data;
+export interface ImageResult extends PixelStats {
+  source: "sample" | "upload";
+  fileName: string;
+  width: number;
+  height: number;
+  runId: string;
+}
 
-        // mid-lung band: rows 22..52, cols 8..56 (skips spine column ±3px)
-        let sum = 0;
-        let n = 0;
-        const vals: number[] = [];
-        for (let y = 22; y < 52; y++) {
-          for (let x = 8; x < 56; x++) {
-            if (Math.abs(x - 32) <= 3) continue; // spine
-            const i = (y * 64 + x) * 4;
-            const lum = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) / 255;
-            vals.push(lum);
-            sum += lum;
-            n++;
-          }
-        }
-        const mean = n ? sum / n : 0.3;
-        const variance = n ? vals.reduce((a, v) => a + (v - mean) ** 2, 0) / n : 0;
+/** Calculate descriptive grayscale statistics from RGBA pixel data. */
+export function calculatePixelStats(data: ArrayLike<number>, width: number, height: number): PixelStats {
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
+    throw new Error("Image dimensions must be positive integers.");
+  }
+  if (data.length !== width * height * 4) {
+    throw new Error("Pixel buffer length does not match its image dimensions.");
+  }
+
+  let sum = 0;
+  let minLuminance = 255;
+  let maxLuminance = 0;
+  const luminances = new Array<number>(width * height);
+
+  for (let pixel = 0; pixel < width * height; pixel++) {
+    const index = pixel * 4;
+    const alpha = data[index + 3] / 255;
+    // Composite transparent pixels over black so transparent padding is measured consistently.
+    const red = data[index] * alpha;
+    const green = data[index + 1] * alpha;
+    const blue = data[index + 2] * alpha;
+    const luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+    luminances[pixel] = luminance;
+    sum += luminance;
+    minLuminance = Math.min(minLuminance, luminance);
+    maxLuminance = Math.max(maxLuminance, luminance);
+  }
+
+  const mean = sum / luminances.length;
+  const variance = luminances.reduce((total, value) => total + (value - mean) ** 2, 0) / luminances.length;
+  const round = (value: number) => Math.round(value * 10) / 10;
+  return {
+    meanLuminance: round(mean),
+    luminanceStdDev: round(Math.sqrt(variance)),
+    minLuminance: round(minLuminance),
+    maxLuminance: round(maxLuminance),
+    sampledPixels: luminances.length,
+  };
+}
+
+/** Read an image in the browser and calculate pixel statistics without classification. */
+export function inspectImagePixels(
+  source: ImageResult["source"],
+  fileName: string,
+  dataUrl: string,
+): Promise<ImageResult> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      try {
+        const width = image.naturalWidth;
+        const height = image.naturalHeight;
+        if (!width || !height) throw new Error("The image has no readable pixel dimensions.");
+
+        // Preserve aspect ratio while bounding browser work to at most 128×128 pixels.
+        const scale = Math.min(1, 128 / Math.max(width, height));
+        const sampleWidth = Math.max(1, Math.round(width * scale));
+        const sampleHeight = Math.max(1, Math.round(height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = sampleWidth;
+        canvas.height = sampleHeight;
+        const context = canvas.getContext("2d", { willReadFrequently: true });
+        if (!context) throw new Error("This browser could not create a pixel-reading canvas.");
+        context.fillStyle = "#000";
+        context.fillRect(0, 0, sampleWidth, sampleHeight);
+        context.drawImage(image, 0, 0, sampleWidth, sampleHeight);
+        const pixels = context.getImageData(0, 0, sampleWidth, sampleHeight).data;
+        const stats = calculatePixelStats(pixels, sampleWidth, sampleHeight);
         resolve({
-          opacity: Math.round(mean * 1000) / 1000,
-          heterogeneity: Math.round(Math.sqrt(variance) * 1000) / 1000,
-          size: img.naturalWidth || 0,
+          ...stats,
+          source,
+          fileName,
+          width,
+          height,
+          runId: `PX-${Date.now().toString(36).toUpperCase()}`,
         });
-      } catch {
-        resolve(fallback);
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error("Could not inspect image pixels."));
       }
     };
-    img.onerror = () => resolve(fallback);
-    img.src = dataUrl;
+    image.onerror = () => reject(new Error("The selected image could not be decoded."));
+    image.src = dataUrl;
   });
-}
-
-/**
- * Fixed logistic head. Constants calibrated so a dark, clear film maps low
- * and an opaque, heterogeneous one maps high. Weights are published here —
- * nothing hidden.
- */
-export function opacityToPneumonia(f: RadiographFeatures): number {
-  const z = -4.6 + 7.2 * f.opacity + 2.4 * Math.min(f.heterogeneity, 0.4);
-  const p = 100 / (1 + Math.exp(-z));
-  return Math.round(Math.min(95, Math.max(4, p)) * 10) / 10;
 }

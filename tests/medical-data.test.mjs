@@ -32,17 +32,18 @@ describe("medical demo copy and reference data", () => {
   test("status ticker avoids unsupported clinical performance claims", () => {
     const copy = TICKER_ITEMS.join(" | ");
     assert.match(copy, /educational demonstration/i);
-    assert.match(copy, /simulated/i);
+    assert.match(copy, /pixel statistics/i);
     assert.match(copy, /not probabilities/i);
     assert.doesNotMatch(copy, /scans analyzed|accuracy|recall-first/i);
     assert.match(copy, /no clinical validation/i);
   });
 
-  test("chatbot copy accurately describes simulated features and limits", () => {
+  test("chatbot copy accurately describes pixel features and limits", () => {
     const answer = (key) => CHAT_KB.find((entry) => entry.keys.includes(key))?.answer ?? "";
     assert.match(answer("cnn"), /does not run a CNN/i);
-    assert.match(answer("image"), /simulated/i);
-    assert.match(answer("architecture"), /does not run a radiology or dermoscopy model/i);
+    assert.match(answer("image"), /reads uploaded image pixels/i);
+    assert.match(answer("architecture"), /image pixel-statistics lab/i);
+    assert.match(answer("architecture"), /does not run a trained radiology or dermoscopy model/i);
     assert.match(answer("validated"), /not.*clinically validated/i);
     assert.match(answer("urgent"), /cannot assess urgency/i);
     assert.match(answer("fever"), /cannot provide personal treatment advice/i);

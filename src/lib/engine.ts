@@ -20,11 +20,6 @@ export function hashString(s: string): number {
   return h >>> 0;
 }
 
-export function rand01(seed: number): number {
-  const x = Math.imul(seed ^ 0x9e3779b9, 2654435761) >>> 0;
-  return (x % 100000) / 100000;
-}
-
 /* ---------- symptom inference ---------- */
 
 export interface ScoredDisease {
@@ -101,59 +96,6 @@ export function analyzeSymptoms(
     },
   };
 }
-
-/* ---------- image inference (simulated CNN) ---------- */
-
-export interface ImageResult {
-  source: "pneumonia-sample" | "normal-sample" | "upload";
-  fileName: string;
-  normal: number;
-  pneumonia: number;
-  heat: { x: number; y: number; size: number };
-  runId: string;
-}
-
-export function predictImage(source: ImageResult["source"], fileName: string, seedKey: string): ImageResult {
-  const h = hashString(seedKey + fileName + source);
-  let pneumonia: number;
-  let heat: ImageResult["heat"];
-
-  if (source === "pneumonia-sample") {
-    pneumonia = 89 + rand01(h) * 7;
-    heat = { x: 62 + rand01(h ^ 7) * 12, y: 60 + rand01(h ^ 13) * 14, size: 30 + rand01(h ^ 29) * 12 };
-  } else if (source === "normal-sample") {
-    pneumonia = 2.5 + rand01(h) * 4.5;
-    heat = { x: 30 + rand01(h ^ 7) * 40, y: 30 + rand01(h ^ 13) * 30, size: 14 + rand01(h ^ 29) * 8 };
-  } else {
-    pneumonia = rand01(h) < 0.42 ? 62 + rand01(h ^ 3) * 33 : 4 + rand01(h ^ 5) * 26;
-    heat = { x: 35 + rand01(h ^ 7) * 35, y: 38 + rand01(h ^ 13) * 32, size: 18 + rand01(h ^ 29) * 20 };
-  }
-
-  pneumonia = Math.round(pneumonia * 10) / 10;
-  return {
-    source,
-    fileName,
-    normal: Math.round((100 - pneumonia) * 10) / 10,
-    pneumonia,
-    heat,
-    runId: `CX-${String(h % 9973).padStart(4, "0")}`,
-  };
-}
-
-export const CNN_LOG: { stage: number; line: string }[] = [
-  { stage: 0, line: "▸ decoding image buffer … ok" },
-  { stage: 1, line: "▸ cv2.resize → (224, 224, 3)" },
-  { stage: 1, line: "▸ normalize: pixel / 255.0 → [0,1]" },
-  { stage: 2, line: "▸ Conv2D 32×(3,3) relu → (222,222,32)" },
-  { stage: 2, line: "▸ MaxPooling2D (2,2) → (111,111,32)" },
-  { stage: 2, line: "▸ Conv2D 64×(3,3) relu → (109,109,64)" },
-  { stage: 2, line: "▸ MaxPooling2D (2,2) → (54,54,64)" },
-  { stage: 2, line: "▸ Dropout(0.35)" },
-  { stage: 3, line: "▸ Flatten → Dense(128, relu)" },
-  { stage: 3, line: "▸ Dense(2, softmax) → probabilities" },
-  { stage: 4, line: "▸ Grad-CAM: upsampled attention map" },
-  { stage: 4, line: "✓ inference complete" },
-];
 
 /* ---------- misc formatting ---------- */
 

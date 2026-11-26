@@ -7,7 +7,7 @@ import { Chatbot } from "./components/Chatbot";
 import { ReportPanel } from "./components/ReportPanel";
 import { ModelRegistry } from "./components/ModelRegistry";
 import { TrainingGrounds } from "./components/TrainingGrounds";
-import type { ImageResult } from "./lib/engine";
+import type { ImageResult } from "./lib/pixel";
 
 interface AnalysisReport {
   patientId: string | null;
@@ -51,7 +51,6 @@ export default function App() {
         : { patientId: activePatientId, patient: patientSnapshot };
       return { ...current, image };
     });
-    setTab("patient");
   };
 
   const handleAdmit = (p: Patient) => {
@@ -90,8 +89,8 @@ export default function App() {
           </h2>
           <p className="mt-4 max-w-2xl text-lg leading-relaxed text-inksoft">
             An educational software demo, not a clinical decision-support tool. Symptom scores use a small reference table, and
-            radiology results are simulated; external model cards are listed for learning and are not
-            loaded by this app.
+            the radiology lab reports image pixel statistics without disease detection; external model cards
+            are listed for learning and are not loaded by this app.
           </p>
         </div>
       </section>

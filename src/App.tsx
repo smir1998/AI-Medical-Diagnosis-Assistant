@@ -89,8 +89,8 @@ export default function App() {
           </h2>
           <p className="mt-4 max-w-2xl text-lg leading-relaxed text-inksoft">
             An educational software demo, not a clinical decision-support tool. Symptom scores use a small reference table, and
-            the radiology lab scores 18 findings on uploaded frontal chest X-rays using a research model. These outputs and
-            activation heatmaps are not diagnoses, and this chest model cannot read other body parts.
+            the radiology lab has separate research models for chest and orthopedic X-rays, including 18 chest findings and
+            bone fracture scoring with activation maps. Neither model provides a diagnosis or reads other image types.
           </p>
         </div>
       </section>

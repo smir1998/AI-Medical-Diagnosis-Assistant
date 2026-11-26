@@ -3,6 +3,7 @@ import normalSample from "../assets/cxr-normal.svg";
 import pneumoniaSample from "../assets/cxr-pneumonia.svg";
 import { inspectImagePixels, type ImageResult } from "../lib/pixel";
 import { activationMapDataUrl, CXR_MODEL_CARD, scoreFrontalChestXray } from "../lib/cxrModel";
+import { FRACTURE_CAM_SIZE, FRACTURE_MODEL_CARD, scoreOrthopedicXray } from "../lib/fractureModel";
 
 interface Props {
   onComplete: (result: ImageResult) => void;
@@ -10,11 +11,13 @@ interface Props {
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const ORTHOPEDIC_INPUT_SIZE = 384;
 
 export function ImageAnalysis({ onComplete }: Props) {
   const [image, setImage] = useState<string | null>(null);
   const [fileName, setFileName] = useState("");
   const [source, setSource] = useState<ImageResult["source"]>("upload");
+  const [modality, setModality] = useState<"chest" | "orthopedic">("chest");
   const [result, setResult] = useState<ImageResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [modelProgress, setModelProgress] = useState<number | null>(null);
@@ -23,6 +26,7 @@ export function ImageAnalysis({ onComplete }: Props) {
   const [error, setError] = useState("");
 
   const loadSample = (src: string, name: string) => {
+    setModality("chest");
     setImage(src);
     setFileName(name);
     setSource("sample");
@@ -77,12 +81,16 @@ export function ImageAnalysis({ onComplete }: Props) {
     setModelProgress(null);
     try {
       if (source !== "upload") {
-        throw new Error("Synthetic illustrations are for pixel practice only. Upload a frontal chest X-ray to run the trained model.");
+        throw new Error("Synthetic illustrations are for pixel practice only. Upload a real chest or orthopedic X-ray for its matching research model.");
       }
       const analysis = await inspectImagePixels(source, fileName, image);
-      const model = await scoreFrontalChestXray(image, setModelProgress);
-      setSelectedFindingIndex(model.findings[0]?.modelIndex ?? 0);
-      analysis.model = model;
+      if (modality === "chest") {
+        const model = await scoreFrontalChestXray(image, setModelProgress);
+        setSelectedFindingIndex(model.findings[0]?.modelIndex ?? 0);
+        analysis.model = model;
+      } else {
+        analysis.fractureModel = await scoreOrthopedicXray(image, setModelProgress);
+      }
       setResult(analysis);
       onComplete(analysis);
     } catch (cause) {
@@ -94,32 +102,43 @@ export function ImageAnalysis({ onComplete }: Props) {
 
   const selectedFinding = result?.model?.findings.find((finding) => finding.modelIndex === selectedFindingIndex)
     ?? result?.model?.findings[0];
-  const overlayStyle = result
+  const overlayStyle = result && modality === "chest"
     ? {
         width: `${(Math.min(result.width, result.height) / result.width) * 100}%`,
         height: `${(Math.min(result.width, result.height) / result.height) * 100}%`,
         left: `${((result.width - Math.min(result.width, result.height)) / 2 / result.width) * 100}%`,
         top: `${((result.height - Math.min(result.width, result.height)) / 2 / result.height) * 100}%`,
       }
-    : undefined;
+    : result
+      ? {
+          width: `${(Math.round((result.width * ORTHOPEDIC_INPUT_SIZE) / Math.max(result.width, result.height)) / ORTHOPEDIC_INPUT_SIZE) * 100}%`,
+          height: `${(Math.round((result.height * ORTHOPEDIC_INPUT_SIZE) / Math.max(result.width, result.height)) / ORTHOPEDIC_INPUT_SIZE) * 100}%`,
+          left: `${Math.floor((ORTHOPEDIC_INPUT_SIZE - Math.round((result.width * ORTHOPEDIC_INPUT_SIZE) / Math.max(result.width, result.height))) / 2) / ORTHOPEDIC_INPUT_SIZE * 100}%`,
+          top: `${Math.floor((ORTHOPEDIC_INPUT_SIZE - Math.round((result.height * ORTHOPEDIC_INPUT_SIZE) / Math.max(result.width, result.height))) / 2) / ORTHOPEDIC_INPUT_SIZE * 100}%`,
+        }
+      : undefined;
 
   return (
     <div className="space-y-5">
+      <div className="flex flex-wrap gap-2" role="group" aria-label="X-ray type">
+        <button type="button" onClick={() => { setModality("chest"); setResult(null); }} aria-pressed={modality === "chest"} className="border-2 border-ink px-3 py-2 font-mono text-xs font-bold aria-pressed:bg-teal aria-pressed:text-paper">Chest X-ray</button>
+        <button type="button" onClick={() => { setModality("orthopedic"); setResult(null); }} aria-pressed={modality === "orthopedic"} className="border-2 border-ink px-3 py-2 font-mono text-xs font-bold aria-pressed:bg-teal aria-pressed:text-paper">Orthopedic X-ray</button>
+      </div>
       <div className="flex flex-wrap items-center gap-2">
-        <button
+        {modality === "chest" && <button
           type="button"
           onClick={() => loadSample(normalSample, "synthetic-sample-a.svg")}
           className="inline-flex items-center gap-2 border border-ink/25 bg-paper px-3 py-2 font-mono text-xs font-semibold text-ink transition-all duration-200 hover:-translate-y-px hover:border-ink"
         >
           Synthetic sample A
-        </button>
-        <button
+        </button>}
+        {modality === "chest" && <button
           type="button"
           onClick={() => loadSample(pneumoniaSample, "synthetic-sample-b.svg")}
           className="inline-flex items-center gap-2 border border-ink/25 bg-paper px-3 py-2 font-mono text-xs font-semibold text-ink transition-all duration-200 hover:-translate-y-px hover:border-ink"
         >
           Synthetic sample B
-        </button>
+        </button>}
         <label className="inline-flex cursor-pointer items-center gap-2 border border-dashed border-teal/60 px-3 py-2 font-mono text-xs font-semibold text-teal transition-all duration-200 hover:bg-teal/10">
           Upload image
           <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} className="sr-only" />
@@ -127,10 +146,9 @@ export function ImageAnalysis({ onComplete }: Props) {
       </div>
 
       <p className="border-l-2 border-amber bg-amber/10 px-3 py-2 text-xs leading-relaxed text-ink">
-        Research and education only. Upload a frontal chest X-ray to score 18 chest findings and view a class activation map
-        for each. These scores are independent model outputs, not calibrated probabilities or a diagnosis. This model only reads
-        chest X-rays; it cannot interpret other body parts or support care decisions. Image inference stays in this browser.
-        First use downloads the model weights (~28.3 MB) and ONNX browser runtime.
+        {modality === "chest"
+          ? "Research and education only. Upload a frontal chest X-ray to score 18 chest findings and view a class activation map for each. These outputs are not calibrated probabilities or a diagnosis. The chest model cannot interpret bone X-rays."
+          : "Research and education only. Upload a plain orthopedic X-ray for a FracAtlas-trained fracture score and Grad-CAM map. It was evaluated on hand, leg, hip and shoulder images from FracAtlas; it cannot read chest X-rays, CT, MRI, skull, spine or ribs. A low score cannot rule out a fracture."} Image inference stays in this browser. First use downloads the selected model and ONNX browser runtime.
       </p>
       {error && <p role="alert" className="text-sm font-semibold text-alert">{error}</p>}
 
@@ -140,10 +158,18 @@ export function ImageAnalysis({ onComplete }: Props) {
             <div className="w-full p-4">
               <div className="relative mx-auto w-fit max-w-full">
                 <img src={image} alt="Image loaded for model analysis" className="block max-h-[340px] max-w-full border border-mint/25 object-contain" />
-                {result?.model && showHeatmap && (
+                {result?.model && showHeatmap && modality === "chest" && (
                   <img
-                    src={activationMapDataUrl(result.model.camMaps[selectedFindingIndex] ?? result.model.camMaps[0] ?? [])}
+                    src={activationMapDataUrl(result.model.camMaps[selectedFindingIndex] ?? result.model.camMaps[0] ?? [], 7, 224)}
                     alt={`Class activation map for ${selectedFinding?.name ?? "selected finding"}; highlighted areas show model activation, not a lesion`}
+                    style={overlayStyle}
+                    className="pointer-events-none absolute object-fill"
+                  />
+                )}
+                {result?.fractureModel && showHeatmap && modality === "orthopedic" && (
+                  <img
+                    src={activationMapDataUrl(result.fractureModel.camMap, FRACTURE_CAM_SIZE, ORTHOPEDIC_INPUT_SIZE)}
+                    alt="Grad-CAM heatmap showing regions associated with the fracture model score; not a fracture outline"
                     style={overlayStyle}
                     className="pointer-events-none absolute object-fill"
                   />
@@ -156,7 +182,7 @@ export function ImageAnalysis({ onComplete }: Props) {
           ) : (
             <p className="px-6 text-center font-mono text-xs leading-relaxed text-mint/50">
               no image loaded
-              <span className="mt-1 block">choose a synthetic sample or upload a JPEG, PNG, or WebP image</span>
+              <span className="mt-1 block">upload a JPEG, PNG, or WebP image{modality === "chest" ? " or choose a synthetic chest sample" : ""}</span>
             </p>
           )}
         </div>
@@ -167,16 +193,22 @@ export function ImageAnalysis({ onComplete }: Props) {
             {result ? (
               <>
                 <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-2">
-                  <dt>Highest-scoring model finding</dt><dd className="font-bold text-amber">{selectedFinding?.name}</dd>
-                  <dt>Relative model score</dt><dd>{((selectedFinding?.score ?? 0) * 100).toFixed(1)} / 100</dd>
+                  {modality === "chest" ? <>
+                    <dt>Highest-scoring model finding</dt><dd className="font-bold text-amber">{selectedFinding?.name}</dd>
+                    <dt>Relative model score</dt><dd>{((selectedFinding?.score ?? 0) * 100).toFixed(1)} / 100</dd>
+                  </> : <>
+                    <dt>Fracture model score</dt><dd className="font-bold text-amber">{((result.fractureModel?.score ?? 0) * 100).toFixed(1)} / 100</dd>
+                    <dt>Research flag</dt><dd>{result.fractureModel?.flagged ? "Above model cutoff" : "Below model cutoff"}</dd>
+                    <dt>Model cutoff</dt><dd>{((result.fractureModel?.threshold ?? 0) * 100).toFixed(2)} / 100</dd>
+                  </>}
                   <dt>Image dimensions</dt><dd>{result.width} × {result.height}</dd>
                   <dt>Mean luminance</dt><dd>{result.meanLuminance} / 255</dd>
                   <dt>Luminance variation</dt><dd>{result.luminanceStdDev} / 255</dd>
                   <dt>Observed pixel range</dt><dd>{result.minLuminance}–{result.maxLuminance}</dd>
                   <dt>Pixels sampled</dt><dd>{result.sampledPixels.toLocaleString()}</dd>
-                  <dt>Model</dt><dd><a href={CXR_MODEL_CARD} target="_blank" rel="noreferrer" className="underline">XRV DenseNet · 18 findings</a></dd>
+                  <dt>Model</dt><dd><a href={modality === "chest" ? CXR_MODEL_CARD : FRACTURE_MODEL_CARD} target="_blank" rel="noreferrer" className="underline">{modality === "chest" ? "XRV DenseNet · 18 findings" : "FracAtlas ConvNeXt-Tiny"}</a></dd>
                 </dl>
-                <div className="mt-4 border-t border-mint/15 pt-3">
+                {modality === "chest" ? <div className="mt-4 border-t border-mint/15 pt-3">
                   <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-mint/60">Ranked model outputs · select to inspect map</p>
                   <ol className="max-h-56 space-y-1 overflow-y-auto pr-1">
                     {result.model!.findings.map((finding, index) => (
@@ -192,19 +224,19 @@ export function ImageAnalysis({ onComplete }: Props) {
                       </li>
                     ))}
                   </ol>
-                </div>
+                </div> : <p className="mt-3 border-t border-mint/15 pt-2 text-[10px] text-mint/55">The Grad-CAM map highlights model activation; it does not mark or confirm a fracture.</p>}
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button type="button" onClick={() => setShowHeatmap(false)} aria-pressed={!showHeatmap} className="border border-mint/30 px-2 py-1 text-[10px] aria-pressed:bg-teal">Original</button>
                   <button type="button" onClick={() => setShowHeatmap(true)} aria-pressed={showHeatmap} className="border border-mint/30 px-2 py-1 text-[10px] aria-pressed:bg-teal">Activation overlay</button>
                 </div>
               </>
             ) : (
-              <p className="text-mint/45">The ranked findings and activation map will appear after a frontal chest X-ray is analyzed.</p>
+              <p className="text-mint/45">{modality === "chest" ? "The ranked findings and activation map will appear after a frontal chest X-ray is analyzed." : "The fracture score and Grad-CAM will appear after an orthopedic X-ray is analyzed."}</p>
             )}
             <p className="mt-4 border-t border-mint/15 pt-2 text-[10px] text-mint/45">
-              {result?.model
-                ? "Research only; not a disease conclusion. Scores are independent and are not calibrated probabilities. The activation map is coarse model attention, not a lesion outline. Performance varies across datasets and populations."
-                : "Synthetic samples support pixel practice only; they are not scored by the trained model."}
+              {modality === "chest"
+                ? result?.model ? "Research only; not a disease conclusion. Scores are independent and are not calibrated probabilities. The activation map is coarse model attention, not a lesion outline. Performance varies across datasets and populations." : "Synthetic samples support pixel practice only; they are not scored by the trained model."
+                : result?.fractureModel ? "Research only; this score does not diagnose or rule out fracture. The activation map is not a fracture outline. The model's published held-out precision was 39.8%, with performance varying by bone region." : "This model only accepts orthopedic X-rays; synthetic chest samples are not scored."}
             </p>
           </div>
 

@@ -248,14 +248,14 @@ export const CHAT_KB: ChatEntry[] = [
       "Fever can have many causes, and what to do depends on age, health, and other symptoms. This app cannot provide personal treatment advice. Contact a qualified clinician if you are concerned, and use local emergency services for severe or rapidly worsening symptoms.",
   },
   {
-    keys: ["x-ray", "xray", "upload", "image", "prepare"],
+    keys: ["x-ray", "xray", "upload", "image", "prepare", "fracture", "broken bone", "orthopedic"],
     answer:
-      "The Radiology Lab runs a research-only TorchXRayVision DenseNet model on uploaded frontal chest X-rays. It returns independent scores for 18 findings and a class activation map for the selected finding. Scores are not calibrated probabilities or a patient-specific diagnosis, and the model cannot read other body parts. Performance varies across datasets and populations.",
+      "The Radiology Lab offers separate research models: TorchXRayVision DenseNet returns independent scores for 18 frontal chest X-ray findings, while a FracAtlas-trained orthopedic model returns a fracture score for musculoskeletal X-rays. Their scores and activation maps are not a patient diagnosis, and each model is limited to its training image scope.",
   },
   {
     keys: ["how does", "how it works", "work", "architecture", "pipeline"],
     answer:
-      "The active app has a patient list, a hand-weighted symptom scoring demo, a research-only 18-finding chest X-ray model, a keyword-based educational chatbot, a report view, a model reference list, and a separate SGD training sandbox. The sandbox trains on bundled symptom rows but does not power the Symptom Lab. Image inference runs locally in the browser; model scores are not calibrated probabilities or diagnoses.",
+      "The active app has a patient list, a hand-weighted symptom scoring demo, separate chest and orthopedic X-ray research models, a keyword-based educational chatbot, a report view, a model reference list, and a separate SGD training sandbox. The sandbox trains on bundled symptom rows but does not power the Symptom Lab. Image inference runs locally in the browser; model scores are not diagnoses.",
   },
   {
     keys: ["deploy", "streamlit", "fastapi", "render", "railway"],

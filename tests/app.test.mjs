@@ -40,11 +40,13 @@ describe("active application wiring", () => {
     const image = await read("src/components/ImageAnalysis.tsx");
     const report = await read("src/components/ReportPanel.tsx");
     const model = await read("src/lib/cxrModel.ts");
-    assert.match(app, /scores 18 findings/i);
+    assert.match(app, /18 chest findings/i);
     assert.match(image, /inspectImagePixels/);
     assert.match(image, /scoreFrontalChestXray/);
+    assert.match(image, /scoreOrthopedicXray/);
+    assert.match(image, /FracAtlas-trained fracture score/);
     assert.match(image, /activationMapDataUrl/);
-    assert.match(image, /independent model outputs/i);
+    assert.match(image, /18 chest findings/i);
     assert.match(image, /findings\.map/);
     assert.match(image, /not calibrated probabilities or a diagnosis/);
     assert.match(model, /CHEST_FINDINGS = \[/);

@@ -41,9 +41,9 @@ describe("medical demo copy and reference data", () => {
   test("chatbot copy describes multi-finding radiology model and clinical limits", () => {
     const answer = (key) => CHAT_KB.find((entry) => entry.keys.includes(key))?.answer ?? "";
     assert.match(answer("cnn"), /TorchXRayVision DenseNet/i);
-    assert.match(answer("image"), /18 findings/i);
-    assert.match(answer("architecture"), /18-finding chest X-ray model/i);
-    assert.match(answer("architecture"), /not calibrated probabilities or diagnoses/i);
+    assert.match(answer("image"), /FracAtlas-trained orthopedic model/i);
+    assert.match(answer("architecture"), /separate chest and orthopedic X-ray research models/i);
+    assert.match(answer("architecture"), /model scores are not diagnoses/i);
     assert.match(answer("validated"), /not.*clinically validated/i);
     assert.match(answer("urgent"), /cannot assess urgency/i);
     assert.match(answer("fever"), /cannot provide personal treatment advice/i);

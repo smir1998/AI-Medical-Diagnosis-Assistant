@@ -20,7 +20,8 @@ describe("README reflects the current educational app", () => {
   test("documents current feature behavior without advertising removed modules", () => {
     assert.match(readme, /hand-weighted relative scores/);
     assert.match(readme, /densenet121-res224-all/);
-    assert.match(readme, /ranks 18 independently-scored findings/);
+    assert.match(readme, /returns 18 independent findings/);
+    assert.match(readme, /FracAtlas-trained orthopedic model/);
     assert.match(readme, /class activation map/);
     assert.match(readme, /inference runs in the browser/);
     assert.match(readme, /separate multinomial logistic model/);

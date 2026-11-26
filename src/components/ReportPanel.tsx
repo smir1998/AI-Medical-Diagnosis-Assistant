@@ -111,6 +111,14 @@ export function ReportPanel({ symptom, image, patient }: Props) {
                     <p><span className="text-inksoft">MODEL&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</span> {image.model.modelId}</p>
                   </>
                 )}
+                {image.fractureModel && (
+                  <>
+                    <p><span className="text-inksoft">FRACTURE MODEL SCORE :</span> {(image.fractureModel.score * 100).toFixed(1)} / 100</p>
+                    <p><span className="text-inksoft">MODEL FLAG :</span> {image.fractureModel.flagged ? "above development cutoff" : "below development cutoff"}</p>
+                    <p><span className="text-inksoft">CUTOFF :</span> {(image.fractureModel.threshold * 100).toFixed(2)} / 100</p>
+                    <p><span className="text-inksoft">MODEL :</span> {image.fractureModel.modelId} · {image.fractureModel.dataset}</p>
+                  </>
+                )}
                 <p>
                   <span className="text-inksoft">DIMENSIONS&nbsp;&nbsp;:</span> {image.width} × {image.height} px
                 </p>
@@ -147,7 +155,7 @@ export function ReportPanel({ symptom, image, patient }: Props) {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mr-1 inline h-3 w-3 text-amber">
                   <path d="M12 3L1.5 20h21L12 3zM12 9.5v5M12 17.5v.5" />
                 </svg>
-                Research and education only - these are independent model scores for 18 chest X-ray findings, not calibrated probabilities or a disease diagnosis. The heatmap shows coarse model activation, not a lesion. This model cannot read other body parts. Model performance varies across datasets and populations. Do not use these outputs for care decisions.
+                Research and education only - {image?.fractureModel ? "the fracture score and cutoff are research outputs, not a diagnosis; the Grad-CAM map is not a fracture outline." : "these are independent scores for 18 chest X-ray findings, not calibrated probabilities or a disease diagnosis; the activation map is not a lesion outline."} The models only read their selected X-ray type and are not validated for patient care. Do not use these outputs for care decisions.
               </p>
             </div>
           </div>

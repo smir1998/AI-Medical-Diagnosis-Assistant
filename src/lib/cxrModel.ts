@@ -223,14 +223,14 @@ export async function scoreFrontalChestXray(
   };
 }
 
-export function activationMapDataUrl(cam: number[]) {
+export function activationMapDataUrl(cam: number[], camSize = CAM_SIZE, targetSize = INPUT_SIZE) {
   const source = document.createElement("canvas");
-  source.width = CAM_SIZE;
-  source.height = CAM_SIZE;
+  source.width = camSize;
+  source.height = camSize;
   const sourceContext = source.getContext("2d");
   if (!sourceContext) throw new Error("This browser could not render the heatmap.");
-  const sourcePixels = sourceContext.createImageData(CAM_SIZE, CAM_SIZE);
-  for (let i = 0; i < CAM_SIZE * CAM_SIZE; i++) {
+  const sourcePixels = sourceContext.createImageData(camSize, camSize);
+  for (let i = 0; i < camSize * camSize; i++) {
     const strength = Math.max(0, Math.min(1, cam[i] ?? 0));
     const base = i * 4;
     sourcePixels.data[base] = Math.round(255 * Math.min(1, Math.max(0, 1.5 * strength - 0.25)));
@@ -241,11 +241,11 @@ export function activationMapDataUrl(cam: number[]) {
   sourceContext.putImageData(sourcePixels, 0, 0);
 
   const output = document.createElement("canvas");
-  output.width = INPUT_SIZE;
-  output.height = INPUT_SIZE;
+  output.width = targetSize;
+  output.height = targetSize;
   const context = output.getContext("2d");
   if (!context) throw new Error("This browser could not render the heatmap.");
   context.imageSmoothingEnabled = true;
-  context.drawImage(source, 0, 0, INPUT_SIZE, INPUT_SIZE);
+  context.drawImage(source, 0, 0, targetSize, targetSize);
   return output.toDataURL("image/png");
 }

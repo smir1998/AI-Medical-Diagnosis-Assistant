@@ -1,4 +1,5 @@
 import type { CxrModelResult } from "./cxrModel";
+import type { FractureModelResult } from "./fractureModel";
 
 export interface PixelStats {
   meanLuminance: number;
@@ -15,6 +16,7 @@ export interface ImageResult extends PixelStats {
   height: number;
   runId: string;
   model?: CxrModelResult;
+  fractureModel?: FractureModelResult;
 }
 
 /** Calculate descriptive grayscale statistics from RGBA pixel data. */
